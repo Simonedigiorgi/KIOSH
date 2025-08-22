@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: b72723ffc430dbf45adc1a719c652504
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 80868
+  packageName: UModeler
+  packageVersion: 2.11.10
+  assetPath: Assets/tripolygon/PastelTown-BuiltInRP-UModeler/Materials/CarProps.mat
+  uploadId: 722914

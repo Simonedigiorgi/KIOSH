@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: bce42230989a86f4e83b93f74138a0ca
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 0
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 80868
+  packageName: UModeler
+  packageVersion: 2.11.10
+  assetPath: Assets/tripolygon/PastelTown-BuiltInRP-UModeler/Materials/CarPoliceLamp_white.mat
+  uploadId: 722914
