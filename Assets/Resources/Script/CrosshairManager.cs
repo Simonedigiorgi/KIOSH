@@ -8,18 +8,14 @@ public class CrosshairManager : MonoBehaviour
     public Image crosshairImage;
     public TMP_Text targetNameText;
 
-    [Header("Raycast Settings")]
-    public float rayDistance = 3f;
-    public LayerMask interactableLayer;
-
     [Header("Interaction Toggle")]
     public bool isInteracting = false;
 
-    private Camera playerCamera;
+    private PlayerInteractor interactor;
 
     void Start()
     {
-        playerCamera = Camera.main;
+        interactor = FindObjectOfType<PlayerInteractor>();
         ClearTargetText();
     }
 
@@ -32,25 +28,19 @@ public class CrosshairManager : MonoBehaviour
         }
 
         ShowUI();
-        UpdateTargetName();
+        UpdateTargetNameFromInteractor();
     }
 
-    // Esegue il raycast e aggiorna il nome del target
-    void UpdateTargetName()
+    void UpdateTargetNameFromInteractor()
     {
-        Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
-        if (Physics.Raycast(ray, out RaycastHit hit, rayDistance, interactableLayer))
+        if (interactor.currentTargetName != null)
         {
-            // Se ha un componente con nome
-            InteractableName target = hit.collider.GetComponent<InteractableName>();
-            if (target != null)
-            {
-                targetNameText.text = target.displayName;
-                return;
-            }
+            targetNameText.text = interactor.currentTargetName.displayName;
         }
-
-        ClearTargetText();
+        else
+        {
+            ClearTargetText();
+        }
     }
 
     void ClearTargetText()
@@ -70,7 +60,6 @@ public class CrosshairManager : MonoBehaviour
         targetNameText.enabled = true;
     }
 
-    // Chiamati da altri script (es. BulletinInteraction)
     public void SetInteracting(bool value)
     {
         isInteracting = value;

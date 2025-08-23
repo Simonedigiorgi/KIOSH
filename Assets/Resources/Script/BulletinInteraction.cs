@@ -2,8 +2,8 @@
 
 public class BulletinInteraction : MonoBehaviour
 {
-    public Transform cameraTargetPosition;     // Posizione davanti al monitor
-    public Transform playerCamera;             // Camera del player
+    public Transform cameraTargetPosition;
+    public Transform playerCamera;
     public float cameraMoveSpeed = 5f;
     public CrosshairManager crosshairManager;
     public BulletinController bulletinController;
@@ -14,6 +14,13 @@ public class BulletinInteraction : MonoBehaviour
     private bool isInteracting = false;
     private bool hasEntered = false;
 
+    private PlayerInteractor playerInteractor;
+
+    void Start()
+    {
+        playerInteractor = FindObjectOfType<PlayerInteractor>();
+    }
+
     void OnEnable()
     {
         Cursor.lockState = CursorLockMode.Locked;
@@ -22,17 +29,23 @@ public class BulletinInteraction : MonoBehaviour
 
     void Update()
     {
-        // Premi E per entrare
-        if (!isInteracting && Input.GetKeyDown(KeyCode.E) && IsLookingAtScreen())
+        if (!isInteracting && Input.GetKeyDown(KeyCode.E) && IsLookingAtPanel())
         {
-            EnterInteraction();
+            if (!playerInteractor.IsHoldingObject())
+            {
+                EnterInteraction();
+            }
         }
 
-        // Premi ESC per uscire
         if (isInteracting && Input.GetKeyDown(KeyCode.Escape))
         {
             ExitInteraction();
         }
+    }
+
+    bool IsLookingAtPanel()
+    {
+        return playerInteractor.currentTarget == this.gameObject;
     }
 
     void EnterInteraction()
@@ -42,51 +55,35 @@ public class BulletinInteraction : MonoBehaviour
         isInteracting = true;
         hasEntered = true;
 
-        // Salva posizione camera
         originalCamPosition = playerCamera.position;
         originalCamRotation = playerCamera.rotation;
 
-        // Blocca movimento player
         FindObjectOfType<PlayerController>().enabled = false;
         crosshairManager.SetInteracting(true);
 
-        // Sposta camera davanti al pannello
         playerCamera.position = cameraTargetPosition.position;
         playerCamera.rotation = cameraTargetPosition.rotation;
 
-        // Blocca il cursore (non visibile, ma disattiva movimenti inutili)
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
-        // ⬇️ Questa riga era mancante!
-        bulletinController.EnterInteraction(); // Attiva la logica interna
+        bulletinController.EnterInteraction();
     }
-
 
     public void ExitInteraction()
     {
         isInteracting = false;
         hasEntered = false;
 
-        // Ripristina camera e movimento
         playerCamera.position = originalCamPosition;
         playerCamera.rotation = originalCamRotation;
+
         FindObjectOfType<PlayerController>().enabled = true;
         crosshairManager.SetInteracting(false);
 
-        // Blocca il cursore di nuovo
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
 
-        // Reimposta il pannello alla sua schermata iniziale
         bulletinController.ForceBackToIntro();
     }
-
-    // Controlla se il player guarda verso il pannello (puoi sostituire con raycast o trigger)
-    bool IsLookingAtScreen()
-    {
-        // In alternativa, puoi aggiungere un trigger collider e usare un flag esterno
-        return true; // fallback semplificato
-    }
-
 }

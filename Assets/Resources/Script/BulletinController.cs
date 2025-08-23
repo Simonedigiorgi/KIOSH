@@ -25,7 +25,6 @@ public class BulletinController : MonoBehaviour
     public Button menuButtonTemplate; // Prefab nascosto da clonare
     public Transform generalMenuContainer; // Container per istanziare i bottoni
     public TMP_Text bulletinText;
-    public Toggle confirmToggle;
     public Button leftButton;
     public Button rightButton;
 
@@ -203,7 +202,6 @@ public class BulletinController : MonoBehaviour
 
         currentPages = pages.ToArray();
         currentPage = 0;
-        confirmToggle.isOn = false;
 
         leftButton.gameObject.SetActive(currentPages.Length > 1);
         rightButton.gameObject.SetActive(currentPages.Length > 1);
@@ -287,13 +285,6 @@ public class BulletinController : MonoBehaviour
             if (text != null)
                 text.color = (i == currentMenuIndex) ? Color.green : Color.white;
         }
-    }
-
-
-
-    public bool IsConfirmed()
-    {
-        return confirmToggle != null && confirmToggle.isOn;
     }
 
     public void ForceBackToIntro()
