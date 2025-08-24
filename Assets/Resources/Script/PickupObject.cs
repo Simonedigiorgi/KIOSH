@@ -1,6 +1,9 @@
 ﻿using UnityEngine;
 
 public enum PickupType { Generic, Pot, Pan, Ingredient, Dish }
+
+public enum IngredientTarget { None, Pot, Pan } // ➕ Aggiunto
+
 [RequireComponent(typeof(Rigidbody))]
 public class PickupObject : MonoBehaviour
 {
@@ -8,6 +11,10 @@ public class PickupObject : MonoBehaviour
     public bool canBePickedUp = true;
     public bool isHeld = false;
     public PickupType type = PickupType.Generic;
+
+    [Header("Ingredient Settings")]
+    public IngredientTarget cookTarget = IngredientTarget.None; // Solo per gli ingredienti
+    public GameObject visualPrefab; // Prefab visuale da instanziare sulla pentola/padella
 
     private Rigidbody rb;
 

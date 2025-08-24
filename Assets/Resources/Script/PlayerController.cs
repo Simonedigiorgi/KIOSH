@@ -25,7 +25,13 @@ public class PlayerController : MonoBehaviour
 
         // Blocca il cursore al centro dello schermo
         Cursor.lockState = CursorLockMode.Locked;
+
+        // Ignora collisioni tra il Player (es. Layer "Player") e Interactable
+        int playerLayer = LayerMask.NameToLayer("Player");
+        int interactableLayer = LayerMask.NameToLayer("Interactable");
+        Physics.IgnoreLayerCollision(playerLayer, interactableLayer, true);
     }
+
 
     void Update()
     {
