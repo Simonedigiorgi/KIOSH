@@ -7963,6 +7963,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ingredientPrefab: {fileID: 2403634875185422350, guid: 59a336f10701b4b46a8a06c3fbc484dd, type: 3}
   ingredientCount: 5
+  isPlaced: 0
 --- !u!114 &1284398457
 MonoBehaviour:
   m_ObjectHideFlags: 0

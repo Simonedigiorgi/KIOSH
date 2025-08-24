@@ -16,25 +16,22 @@ public class ObjectReceiver : MonoBehaviour
     {
         if (item == null) return;
 
-        // Posiziona l’oggetto nel pivot
         item.transform.position = placePivot.position;
         item.transform.rotation = placePivot.rotation;
-        item.transform.SetParent(null); // ❗ Non lo parentiamo
+        item.transform.SetParent(null);
 
         item.isHeld = false;
         item.canBePickedUp = true;
 
-        // 🔄 Riattiva le collisioni!
         var rb = item.GetComponent<Rigidbody>();
         if (rb)
         {
             rb.isKinematic = true;
             rb.useGravity = false;
-            rb.detectCollisions = true; // ← 💥 questa è la chiave
+            rb.detectCollisions = true;
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
         }
-
 
         var interactor = FindObjectOfType<PlayerInteractor>();
         if (interactor != null)
@@ -43,15 +40,13 @@ public class ObjectReceiver : MonoBehaviour
         var cookware = item.GetComponent<Cookware>();
         if (cookware != null)
         {
-            cookware.OnPlacedInReceiver(); // Se serve per aggiornamenti
+            cookware.OnPlacedInReceiver();
         }
 
-        // Se è un pacco, bloccalo
         var package = item.GetComponent<PackageBox>();
         if (package != null)
         {
-            item.canBePickedUp = false;
-            return;
+            package.Place(); // Bloccato dopo essere stato posizionato
         }
     }
 

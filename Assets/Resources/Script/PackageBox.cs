@@ -4,24 +4,25 @@ public class PackageBox : MonoBehaviour
 {
     public GameObject ingredientPrefab;
     public int ingredientCount = 3;
-    public bool isPlaced { get; private set; }
+    public bool isPlaced = false;
 
     private bool isDepleted => ingredientCount <= 0;
 
     public void Place()
     {
         isPlaced = true;
+        GetComponent<PickupObject>().canBePickedUp = false;
     }
 
     public void TryDeliver(PlayerInteractor player)
     {
         if (!isPlaced || isDepleted || player.IsHoldingObject()) return;
 
-        // Instanzia l'ingrediente davanti al giocatore (non ancora nella mano)
         GameObject instance = Instantiate(
             ingredientPrefab,
             player.handPivot.position,
-            player.handPivot.rotation
+            player.handPivot.rotation,
+            player.handPivot
         );
 
         PickupObject pickup = instance.GetComponent<PickupObject>();
@@ -33,17 +34,16 @@ public class PackageBox : MonoBehaviour
         }
 
         pickup.canBePickedUp = true;
-        pickup.isHeld = false;
+        pickup.isHeld = true;
 
-        var rb = instance.GetComponent<Rigidbody>();
-        if (rb != null)
+        var rb = pickup.GetComponent<Rigidbody>();
+        if (rb)
         {
             rb.isKinematic = true;
             rb.detectCollisions = false;
         }
 
-        // 👉 Passiamo il controllo al sistema di pickup del player
-        player.PickUp(pickup);
+        player.ReceiveExternalPickup(pickup);
 
         ingredientCount--;
         Debug.Log($"📦 Ingredienti rimanenti: {ingredientCount}");
