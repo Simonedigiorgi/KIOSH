@@ -45,6 +45,14 @@ public class ObjectReceiver : MonoBehaviour
         {
             cookware.OnPlacedInReceiver(); // Se serve per aggiornamenti
         }
+
+        // Se è un pacco, bloccalo
+        var package = item.GetComponent<PackageBox>();
+        if (package != null)
+        {
+            item.canBePickedUp = false;
+            return;
+        }
     }
 
     public void Unplace(PickupObject item)

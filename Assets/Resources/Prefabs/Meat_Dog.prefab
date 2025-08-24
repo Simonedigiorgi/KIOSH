@@ -179,5 +179,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 466abbd2327d6414cb21a529af4d8c82, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  compatibleTool: 0
+  compatibleTool: 1
   cookedPrefab: {fileID: 6770448299845117541, guid: 8be1cdc1d1abf4048876ee6dd938a56a, type: 3}
+  cookTime: 5

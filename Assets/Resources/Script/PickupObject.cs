@@ -38,8 +38,7 @@ public class PickupObject : MonoBehaviour
         if (rb)
         {
             rb.isKinematic = false;
-            rb.detectCollisions = true; // ← anche qui
+            rb.detectCollisions = true;
         }
     }
-
 }

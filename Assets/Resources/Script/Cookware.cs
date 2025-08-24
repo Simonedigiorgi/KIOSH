@@ -2,21 +2,55 @@
 
 public class Cookware : MonoBehaviour
 {
-    public CookingToolType toolType;              // Indica se è pentola o padella
-    public Transform cookTarget;                  // Dove far comparire il prefab cucinato
-    public float cookTime = 5f;
+    public CookingToolType toolType;
+    public Transform cookTarget;
+
+    [Header("Audio")]
+    public AudioSource loopAudioSource;
+    public AudioClip loopSound;
 
     private GameObject currentCookingInstance;
     private bool isCooking = false;
     private float timer = 0f;
+    private float targetCookTime;
     private Ingredient currentIngredient;
+
+    void Start()
+    {
+        // Setup audio dinamicamente se non già assegnato
+        if (loopAudioSource == null)
+        {
+            loopAudioSource = gameObject.AddComponent<AudioSource>();
+            loopAudioSource.spatialBlend = 1f;
+            loopAudioSource.loop = true;
+            loopAudioSource.playOnAwake = false;
+            loopAudioSource.volume = 0.5f;
+        }
+
+        if (loopSound != null)
+        {
+            loopAudioSource.clip = loopSound;
+        }
+    }
 
     void Update()
     {
         if (isCooking)
         {
             timer += Time.deltaTime;
-            if (timer >= cookTime)
+            float progress = Mathf.Clamp01(timer / targetCookTime);
+
+            // Aggiorna lo shader CookProgress
+            if (currentCookingInstance != null)
+            {
+                var renderer = currentCookingInstance.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.material.SetFloat("_CookProgress", progress);
+                }
+            }
+
+            if (timer >= targetCookTime)
             {
                 OnCookComplete();
             }
@@ -29,19 +63,27 @@ public class Cookware : MonoBehaviour
 
         Ingredient ingredient = pickup.GetComponent<Ingredient>();
         if (ingredient == null || ingredient.cookedPrefab == null) return false;
-
-        // Verifica compatibilità utensile
         if (ingredient.compatibleTool != toolType) return false;
 
-        Destroy(pickup.gameObject); // Distrugge l'ingrediente in mano
+        Destroy(pickup.gameObject);
 
         currentIngredient = ingredient;
+        targetCookTime = ingredient.cookTime;
 
-        currentCookingInstance = Instantiate(ingredient.cookedPrefab, cookTarget.position, cookTarget.rotation, cookTarget);
+        currentCookingInstance = Instantiate(
+            ingredient.cookedPrefab,
+            cookTarget.position,
+            cookTarget.rotation,
+            cookTarget
+        );
+
         isCooking = true;
         timer = 0f;
 
-        // Suono di sfrigolio qui (opzionale)
+        // Avvia suono
+        if (loopAudioSource != null && loopSound != null)
+            loopAudioSource.Play();
+
         return true;
     }
 
@@ -49,15 +91,11 @@ public class Cookware : MonoBehaviour
     {
         isCooking = false;
 
-        // Cambia colore (o effetto visivo)
-        if (currentCookingInstance != null)
-        {
-            Renderer rend = currentCookingInstance.GetComponent<Renderer>();
-            if (rend != null)
-                rend.material.color = Color.red; // oppure altro effetto
-        }
+        // Ferma il suono
+        if (loopAudioSource != null && loopAudioSource.isPlaying)
+            loopAudioSource.Stop();
 
-        // Puoi aggiungere effetto audio/particelle qui
+        // Nessuna modifica al colore: è gestito dallo shader via CookProgress
     }
 
     public void ClearCookedIngredient()
@@ -69,6 +107,9 @@ public class Cookware : MonoBehaviour
         currentIngredient = null;
         isCooking = false;
         timer = 0f;
+
+        if (loopAudioSource != null && loopAudioSource.isPlaying)
+            loopAudioSource.Stop();
     }
 
     public bool HasCookedIngredient()
@@ -76,11 +117,5 @@ public class Cookware : MonoBehaviour
         return !isCooking && currentCookingInstance != null;
     }
 
-    public void OnPlacedInReceiver()
-    {
-        // Puoi usare questo metodo se vuoi, ma per ora può rimanere vuoto.
-        // Ad esempio: potresti aggiornare uno stato, giocare un suono, ecc.
-    }
-
-
+    public void OnPlacedInReceiver() { }
 }

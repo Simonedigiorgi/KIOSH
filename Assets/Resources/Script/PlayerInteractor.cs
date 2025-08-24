@@ -43,14 +43,11 @@ public class PlayerInteractor : MonoBehaviour
         {
             GameObject hitObject = hit.collider.gameObject;
 
-            // ✅ Blocca oggetti dietro ai muri
+            // Blocca oggetti non nel layer giusto
             if (((1 << hitObject.layer) & interactableLayer) == 0)
-            {
-                Debug.Log($"⛔ Raycast ha colpito qualcosa fuori da interactableLayer: {hitObject.name}");
                 return;
-            }
 
-            // 🎯 Verifica se è un PickupObject
+            // 1. Prova a colpire un Pickup
             var pickup = hitObject.GetComponentInParent<PickupObject>();
             if (pickup != null)
             {
@@ -59,20 +56,11 @@ public class PlayerInteractor : MonoBehaviour
             }
             else
             {
-                // 🎯 Altri oggetti con solo InteractableName
                 currentTarget = hitObject;
                 currentTargetName = hitObject.GetComponent<InteractableName>();
             }
-
-            Debug.Log($"🎯 Raycast colpisce: {hit.collider.name} | Target: {currentTarget.name}");
-        }
-        else
-        {
-            Debug.Log("❌ Nessun target nel mirino");
         }
     }
-
-
 
     void TryInteractOrPickUp()
     {
@@ -82,14 +70,36 @@ public class PlayerInteractor : MonoBehaviour
             return;
         }
 
+        // 1. Verifica se è un PickupObject (padella, pacco, ingrediente, ecc.)
         PickupObject pickup = currentTarget.GetComponent<PickupObject>();
         if (pickup == null)
             pickup = currentTarget.GetComponentInParent<PickupObject>();
 
+        // 2. Verifica se è un pacco
+        var package = pickup != null ? pickup.GetComponent<PackageBox>() : null;
+
+        if (package != null)
+        {
+            if (package.isPlaced)
+            {
+                // Se il pacco è stato posizionato → prova a consegnare ingrediente
+                package.TryDeliver(this);
+                return;
+            }
+            else
+            {
+                // Se il pacco NON è stato posizionato → si comporta come un normale pickup
+                if (pickup.canBePickedUp)
+                {
+                    PickUp(pickup);
+                    return;
+                }
+            }
+        }
+
+        // 3. Altri oggetti pickup normali (non pacchi)
         if (pickup != null)
         {
-            Debug.Log($"✅ Trovato: {pickup.name}, canBePickedUp: {pickup.canBePickedUp}, isHeld: {pickup.isHeld}");
-
             if (pickup.canBePickedUp)
             {
                 PickUp(pickup);
@@ -107,11 +117,17 @@ public class PlayerInteractor : MonoBehaviour
     }
 
 
+    bool IsPackagePlaced(PackageBox box)
+    {
+        return box != null && box.isPlaced;
+    }
+
+
     void TryUseHeldObject()
     {
         if (currentTarget == null || heldPickup == null) return;
 
-        // 🍳 Tenta di cucinare un ingrediente
+        // 1. Cucinare
         Cookware cookware = currentTarget.GetComponent<Cookware>();
         if (cookware != null)
         {
@@ -122,7 +138,7 @@ public class PlayerInteractor : MonoBehaviour
             }
         }
 
-        // 🔲 Tenta di piazzare oggetti come padella o pentola
+        // 2. Piazzare
         ObjectReceiver receiver = currentTarget.GetComponent<ObjectReceiver>();
         if (receiver != null && receiver.CanAccept(heldPickup))
         {
@@ -131,11 +147,10 @@ public class PlayerInteractor : MonoBehaviour
             return;
         }
 
-        // Altri usi futuri
+        // Aggiungi altri casi d’uso qui
     }
 
-
-    void PickUp(PickupObject pickup)
+    public void PickUp(PickupObject pickup)
     {
         heldObject = pickup.gameObject;
         heldPickup = pickup;
