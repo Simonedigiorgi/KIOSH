@@ -13,7 +13,6 @@ public class PlayerInteractor : MonoBehaviour
     private GameObject heldObject;
     private PickupObject heldPickup;
 
-    // 👇 Oggetto attualmente nel mirino
     public GameObject currentTarget { get; private set; }
     public InteractableName currentTargetName { get; private set; }
 
@@ -40,59 +39,108 @@ public class PlayerInteractor : MonoBehaviour
         currentTarget = null;
         currentTargetName = null;
 
-        if (Physics.Raycast(playerCamera.transform.position, playerCamera.transform.forward, out RaycastHit hit, interactDistance, interactableLayer))
+        if (Physics.Raycast(playerCamera.transform.position, playerCamera.transform.forward, out RaycastHit hit, interactDistance))
         {
-            currentTarget = hit.collider.gameObject;
-            currentTargetName = currentTarget.GetComponent<InteractableName>();
+            GameObject hitObject = hit.collider.gameObject;
+
+            // ✅ Blocca oggetti dietro ai muri
+            if (((1 << hitObject.layer) & interactableLayer) == 0)
+            {
+                Debug.Log($"⛔ Raycast ha colpito qualcosa fuori da interactableLayer: {hitObject.name}");
+                return;
+            }
+
+            // 🎯 Verifica se è un PickupObject
+            var pickup = hitObject.GetComponentInParent<PickupObject>();
+            if (pickup != null)
+            {
+                currentTarget = pickup.gameObject;
+                currentTargetName = pickup.GetComponent<InteractableName>();
+            }
+            else
+            {
+                // 🎯 Altri oggetti con solo InteractableName
+                currentTarget = hitObject;
+                currentTargetName = hitObject.GetComponent<InteractableName>();
+            }
+
+            Debug.Log($"🎯 Raycast colpisce: {hit.collider.name} | Target: {currentTarget.name}");
+        }
+        else
+        {
+            Debug.Log("❌ Nessun target nel mirino");
         }
     }
+
+
 
     void TryInteractOrPickUp()
     {
         if (currentTarget == null)
-            return;
-
-        PickupObject pickup = currentTarget.GetComponent<PickupObject>();
-        if (pickup != null && pickup.canBePickedUp)
         {
-            PickUp(pickup);
+            Debug.Log("❌ Nessun target valido nel mirino.");
             return;
         }
 
-        // Altri tipi di interazione futura
+        PickupObject pickup = currentTarget.GetComponent<PickupObject>();
+        if (pickup == null)
+            pickup = currentTarget.GetComponentInParent<PickupObject>();
+
+        if (pickup != null)
+        {
+            Debug.Log($"✅ Trovato: {pickup.name}, canBePickedUp: {pickup.canBePickedUp}, isHeld: {pickup.isHeld}");
+
+            if (pickup.canBePickedUp)
+            {
+                PickUp(pickup);
+                return;
+            }
+            else
+            {
+                Debug.Log("⚠️ Oggetto non raccoglibile al momento.");
+            }
+        }
+        else
+        {
+            Debug.Log("❌ Oggetto non ha PickupObject.");
+        }
     }
+
 
     void TryUseHeldObject()
     {
         if (currentTarget == null || heldPickup == null) return;
 
-        IPlaceableReceiver receiver = currentTarget.GetComponent<IPlaceableReceiver>();
+        // 🍳 Tenta di cucinare un ingrediente
+        Cookware cookware = currentTarget.GetComponent<Cookware>();
+        if (cookware != null)
+        {
+            if (cookware.TryAddIngredient(heldPickup))
+            {
+                ClearHeld();
+                return;
+            }
+        }
+
+        // 🔲 Tenta di piazzare oggetti come padella o pentola
+        ObjectReceiver receiver = currentTarget.GetComponent<ObjectReceiver>();
         if (receiver != null && receiver.CanAccept(heldPickup))
         {
             receiver.Place(heldPickup);
-            heldObject = null;
-            heldPickup = null;
+            ClearHeld();
             return;
         }
 
-        // Potresti gestire anche altri casi futuri (es: interazione tra oggetti)
+        // Altri usi futuri
     }
 
 
-void PickUp(PickupObject pickup)
-{
-    // 🔄 Se era piazzato in un receiver, liberalo
-    if (pickup.currentReceiver != null)
+    void PickUp(PickupObject pickup)
     {
-        pickup.currentReceiver.Unplace();
-        pickup.currentReceiver = null;
+        heldObject = pickup.gameObject;
+        heldPickup = pickup;
+        pickup.PickUp(handPivot);
     }
-
-    heldObject = pickup.gameObject;
-    heldPickup = pickup;
-    pickup.PickUp(handPivot);
-}
-
 
     void DropHeld()
     {
@@ -101,13 +149,7 @@ void PickUp(PickupObject pickup)
             heldPickup.Drop();
         }
 
-        heldObject = null;
-        heldPickup = null;
-    }
-
-    public bool IsHoldingObject()
-    {
-        return heldObject != null;
+        ClearHeld();
     }
 
     public void ClearHeld()
@@ -121,4 +163,8 @@ void PickUp(PickupObject pickup)
         heldPickup = null;
     }
 
+    public bool IsHoldingObject()
+    {
+        return heldObject != null;
+    }
 }

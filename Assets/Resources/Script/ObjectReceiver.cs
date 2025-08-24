@@ -1,66 +1,63 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
-public class ObjectReceiver : MonoBehaviour, IPlaceableReceiver
+public class ObjectReceiver : MonoBehaviour
 {
-    public bool markAsHeld = false;
-    private bool isOccupied = false;
-    public Transform placePivot;
+    [Header("Settings")]
     public List<PickupType> acceptedTypes;
+    public Transform placePivot;
 
     public bool CanAccept(PickupObject item)
     {
-        return !isOccupied && acceptedTypes.Contains(item.type);
+        return item != null && acceptedTypes.Contains(item.type);
     }
 
     public void Place(PickupObject item)
     {
-        isOccupied = true;
+        if (item == null) return;
 
-        // Sgancia dalla mano
-        item.Drop(); // 👈 Aggiungi questa riga per rimuoverlo dalla mano correttamente
-
-        // Posiziona nel punto designato
+        // Posiziona l’oggetto nel pivot
         item.transform.position = placePivot.position;
         item.transform.rotation = placePivot.rotation;
+        item.transform.SetParent(null); // ❗ Non lo parentiamo
 
         item.isHeld = false;
-        item.currentReceiver = this;
+        item.canBePickedUp = true;
 
-        item.canBePickedUp = !markAsHeld;
-
+        // 🔄 Riattiva le collisioni!
         var rb = item.GetComponent<Rigidbody>();
         if (rb)
         {
             rb.isKinematic = true;
+            rb.useGravity = false;
+            rb.detectCollisions = true; // ← 💥 questa è la chiave
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
-            rb.detectCollisions = true;
         }
 
-        // Ignora collisione con il player (opzionale se hai ancora questo passaggio)
-        var playerController = FindObjectOfType<PlayerController>();
-        if (playerController != null)
-        {
-            var playerCollider = playerController.GetComponent<Collider>();
-            var objectCollider = item.GetComponent<Collider>();
 
-            if (playerCollider != null && objectCollider != null)
-            {
-                Physics.IgnoreCollision(playerCollider, objectCollider, true);
-            }
-        }
-
-        // Rimuovi le reference dal PlayerInteractor
         var interactor = FindObjectOfType<PlayerInteractor>();
         if (interactor != null)
             interactor.ClearHeld();
+
+        var cookware = item.GetComponent<Cookware>();
+        if (cookware != null)
+        {
+            cookware.OnPlacedInReceiver(); // Se serve per aggiornamenti
+        }
     }
 
-
-
-    public void Unplace()
+    public void Unplace(PickupObject item)
     {
-        isOccupied = false;
+        if (item == null) return;
+
+        var rb = item.GetComponent<Rigidbody>();
+        if (rb)
+        {
+            rb.isKinematic = false;
+            rb.useGravity = true;
+        }
+
+        item.canBePickedUp = true;
     }
 }

@@ -2,19 +2,12 @@
 
 public enum PickupType { Generic, Pot, Pan, Ingredient, Dish }
 
-public enum IngredientTarget { None, Pot, Pan } // ➕ Aggiunto
-
 [RequireComponent(typeof(Rigidbody))]
 public class PickupObject : MonoBehaviour
 {
-    public ObjectReceiver currentReceiver = null; // 🔄 chi lo ha ricevuto
     public bool canBePickedUp = true;
     public bool isHeld = false;
     public PickupType type = PickupType.Generic;
-
-    [Header("Ingredient Settings")]
-    public IngredientTarget cookTarget = IngredientTarget.None; // Solo per gli ingredienti
-    public GameObject visualPrefab; // Prefab visuale da instanziare sulla pentola/padella
 
     private Rigidbody rb;
 
@@ -45,7 +38,8 @@ public class PickupObject : MonoBehaviour
         if (rb)
         {
             rb.isKinematic = false;
-            rb.detectCollisions = true;
+            rb.detectCollisions = true; // ← anche qui
         }
     }
+
 }

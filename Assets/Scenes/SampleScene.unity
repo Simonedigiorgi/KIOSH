@@ -1595,7 +1595,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 300701276}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: Pivot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2988,9 +2988,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 776ad1ea37f3c2f43ac1e83e841e62ce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  markAsHeld: 0
-  placePivot: {fileID: 557313476}
   acceptedTypes: 02000000
+  placePivot: {fileID: 557313476}
 --- !u!65 &557313473
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -4175,9 +4174,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 776ad1ea37f3c2f43ac1e83e841e62ce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  markAsHeld: 0
-  placePivot: {fileID: 927491067}
   acceptedTypes: 01000000
+  placePivot: {fileID: 927491067}
 --- !u!65 &927491064
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -4475,7 +4473,7 @@ GameObject:
   - component: {fileID: 1016186866}
   - component: {fileID: 1016186865}
   - component: {fileID: 1016186868}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4501,7 +4499,7 @@ MonoBehaviour:
   groundCheckDistance: 0.4
   groundMask:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 64
 --- !u!143 &1016186866
 CharacterController:
   m_ObjectHideFlags: 0
@@ -4833,6 +4831,7 @@ GameObject:
   - component: {fileID: 1041914703}
   - component: {fileID: 1041914702}
   - component: {fileID: 1041914707}
+  - component: {fileID: 1041914708}
   m_Layer: 3
   m_Name: Board
   m_TagString: Untagged
@@ -4876,7 +4875,7 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 1, y: 1, z: 1}
+  m_Size: {x: 1, y: 1, z: 1.27}
   m_Center: {x: 0, y: 0, z: 0}
 --- !u!23 &1041914704
 MeshRenderer:
@@ -4940,7 +4939,7 @@ Transform:
   m_GameObject: {fileID: 1041914701}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1.9253292, y: 1.7055731, z: 6.3357124}
+  m_LocalPosition: {x: -1.9253292, y: 1.7055731, z: 6.368}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -4961,6 +4960,33 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   displayName: Bulletin Board
+--- !u!54 &1041914708
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1041914701}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!1 &1055694216
 GameObject:
   m_ObjectHideFlags: 0
@@ -4978,6 +5004,7 @@ GameObject:
   - component: {fileID: 1055694217}
   - component: {fileID: 1055694224}
   - component: {fileID: 1055694225}
+  - component: {fileID: 1055694226}
   m_Layer: 3
   m_Name: Padella
   m_TagString: Untagged
@@ -4997,12 +5024,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 450b8f88641213346be09d43a9441b45, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentReceiver: {fileID: 0}
   canBePickedUp: 1
   isHeld: 0
   type: 2
-  cookTarget: 0
-  visualPrefab: {fileID: 0}
 --- !u!54 &1055694218
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -5025,7 +5049,7 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 1
+  m_UseGravity: 0
   m_IsKinematic: 1
   m_Interpolate: 0
   m_Constraints: 0
@@ -7166,11 +7190,33 @@ MonoBehaviour:
   m_GameObject: {fileID: 1055694216}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 38e1d0846b5978543b80f4bedd92267e, type: 3}
+  m_Script: {fileID: 11500000, guid: 1b85c19bfe57215488154574b1c59883, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  acceptedTarget: 2
-  cookPivot: {fileID: 300701276}
+  toolType: 1
+  cookTarget: {fileID: 300701276}
+  cookTime: 5
+--- !u!65 &1055694226
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1055694216}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.67535836, y: 0.125, z: 0.55801284}
+  m_Center: {x: -0.058672763, y: 0.0625, z: 0}
 --- !u!1 &1072039462
 GameObject:
   m_ObjectHideFlags: 0
@@ -12126,7 +12172,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1889514561}
-  m_Layer: 3
+  m_Layer: 0
   m_Name: Pivot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -12673,6 +12719,7 @@ GameObject:
   - component: {fileID: 2032283965}
   - component: {fileID: 2032283964}
   - component: {fileID: 2032283972}
+  - component: {fileID: 2032283973}
   m_Layer: 3
   m_Name: Pentola
   m_TagString: Untagged
@@ -12705,12 +12752,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 450b8f88641213346be09d43a9441b45, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentReceiver: {fileID: 0}
   canBePickedUp: 1
   isHeld: 0
   type: 1
-  cookTarget: 0
-  visualPrefab: {fileID: 0}
 --- !u!54 &2032283966
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -12733,7 +12777,7 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 1
+  m_UseGravity: 0
   m_IsKinematic: 1
   m_Interpolate: 0
   m_Constraints: 0
@@ -14739,11 +14783,33 @@ MonoBehaviour:
   m_GameObject: {fileID: 2032283963}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 38e1d0846b5978543b80f4bedd92267e, type: 3}
+  m_Script: {fileID: 11500000, guid: 1b85c19bfe57215488154574b1c59883, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  acceptedTarget: 1
-  cookPivot: {fileID: 1889514561}
+  toolType: 0
+  cookTarget: {fileID: 1889514561}
+  cookTime: 5
+--- !u!65 &2032283973
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2032283963}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.5580127, y: 0.5, z: 0.5580127}
+  m_Center: {x: 0, y: 0.25, z: 0}
 --- !u!1 &2127394601
 GameObject:
   m_ObjectHideFlags: 0
@@ -15432,6 +15498,10 @@ PrefabInstance:
       propertyPath: visualPrefab
       value: 
       objectReference: {fileID: 6770448299845117541, guid: 8be1cdc1d1abf4048876ee6dd938a56a, type: 3}
+    - target: {fileID: 8479132648291424549, guid: 59a336f10701b4b46a8a06c3fbc484dd, type: 3}
+      propertyPath: compatibleTool
+      value: 1
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

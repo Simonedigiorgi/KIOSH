@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 1679246853281304581}
   - component: {fileID: 4004775352624069539}
   - component: {fileID: 7582073439847204655}
+  - component: {fileID: 8479132648291424549}
   m_Layer: 3
   m_Name: Meat_Dog
   m_TagString: Untagged
@@ -150,12 +151,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 450b8f88641213346be09d43a9441b45, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  currentReceiver: {fileID: 0}
   canBePickedUp: 1
   isHeld: 0
   type: 3
-  cookTarget: 2
-  visualPrefab: {fileID: 0}
 --- !u!114 &7582073439847204655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -169,3 +167,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   displayName: Carne di cane
+--- !u!114 &8479132648291424549
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2403634875185422350}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 466abbd2327d6414cb21a529af4d8c82, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  compatibleTool: 0
+  cookedPrefab: {fileID: 6770448299845117541, guid: 8be1cdc1d1abf4048876ee6dd938a56a, type: 3}
