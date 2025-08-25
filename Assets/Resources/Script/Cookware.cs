@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections;
+using UnityEngine;
 
 public class Cookware : MonoBehaviour
 {
@@ -6,8 +7,9 @@ public class Cookware : MonoBehaviour
     public Transform cookTarget;
 
     [Header("Audio")]
-    public AudioSource loopAudioSource;
     public AudioClip loopSound;
+
+    private AudioSource loopAudioSource;
 
     private GameObject currentCookingInstance;
     private bool isCooking = false;
@@ -17,20 +19,17 @@ public class Cookware : MonoBehaviour
 
     void Start()
     {
-        // Setup audio dinamicamente se non già assegnato
+        loopAudioSource = GetComponent<AudioSource>();
         if (loopAudioSource == null)
-        {
             loopAudioSource = gameObject.AddComponent<AudioSource>();
-            loopAudioSource.spatialBlend = 1f;
-            loopAudioSource.loop = true;
-            loopAudioSource.playOnAwake = false;
-            loopAudioSource.volume = 0.5f;
-        }
+
+        loopAudioSource.spatialBlend = 1f;
+        loopAudioSource.loop = true;
+        loopAudioSource.playOnAwake = false;
+        loopAudioSource.volume = 0.5f;
 
         if (loopSound != null)
-        {
             loopAudioSource.clip = loopSound;
-        }
     }
 
     void Update()
@@ -40,7 +39,6 @@ public class Cookware : MonoBehaviour
             timer += Time.deltaTime;
             float progress = Mathf.Clamp01(timer / targetCookTime);
 
-            // Aggiorna lo shader CookProgress
             if (currentCookingInstance != null)
             {
                 var renderer = currentCookingInstance.GetComponent<Renderer>();
@@ -80,7 +78,6 @@ public class Cookware : MonoBehaviour
         isCooking = true;
         timer = 0f;
 
-        // Avvia suono
         if (loopAudioSource != null && loopSound != null)
             loopAudioSource.Play();
 
@@ -91,11 +88,26 @@ public class Cookware : MonoBehaviour
     {
         isCooking = false;
 
-        // Ferma il suono
         if (loopAudioSource != null && loopAudioSource.isPlaying)
-            loopAudioSource.Stop();
+        {
+            StartCoroutine(FadeOutAudio(1f)); // ⏳ Fade-out in 1 secondo
+        }
+    }
 
-        // Nessuna modifica al colore: è gestito dallo shader via CookProgress
+    IEnumerator FadeOutAudio(float duration)
+    {
+        float startVolume = loopAudioSource.volume;
+        float time = 0f;
+
+        while (time < duration)
+        {
+            loopAudioSource.volume = Mathf.Lerp(startVolume, 0f, time / duration);
+            time += Time.deltaTime;
+            yield return null;
+        }
+
+        loopAudioSource.Stop();
+        loopAudioSource.volume = startVolume; // Reset volume per futuri utilizzi
     }
 
     public void ClearCookedIngredient()
@@ -109,7 +121,9 @@ public class Cookware : MonoBehaviour
         timer = 0f;
 
         if (loopAudioSource != null && loopAudioSource.isPlaying)
-            loopAudioSource.Stop();
+        {
+            StartCoroutine(FadeOutAudio(1f));
+        }
     }
 
     public bool HasCookedIngredient()

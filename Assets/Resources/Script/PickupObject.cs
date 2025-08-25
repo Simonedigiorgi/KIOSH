@@ -1,13 +1,13 @@
 ﻿using UnityEngine;
 
-public enum PickupType { Generic, Pot, Pan, Ingredient, Dish }
+public enum PickupType { Package, Pot, Pan, Ingredient, Dish }
 
 [RequireComponent(typeof(Rigidbody))]
 public class PickupObject : MonoBehaviour
 {
     public bool canBePickedUp = true;
     public bool isHeld = false;
-    public PickupType type = PickupType.Generic;
+    public PickupType type = PickupType.Package; // Default ora è Package
 
     private Rigidbody rb;
 

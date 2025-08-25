@@ -3,10 +3,7 @@
 public class PackageBox : MonoBehaviour
 {
     public GameObject ingredientPrefab;
-    public int ingredientCount = 3;
     public bool isPlaced = false;
-
-    private bool isDepleted => ingredientCount <= 0;
 
     public void Place()
     {
@@ -16,7 +13,7 @@ public class PackageBox : MonoBehaviour
 
     public void TryDeliver(PlayerInteractor player)
     {
-        if (!isPlaced || isDepleted || player.IsHoldingObject()) return;
+        if (!isPlaced || player.IsHoldingObject()) return;
 
         GameObject instance = Instantiate(
             ingredientPrefab,
@@ -45,7 +42,7 @@ public class PackageBox : MonoBehaviour
 
         player.ReceiveExternalPickup(pickup);
 
-        ingredientCount--;
-        Debug.Log($"📦 Ingredienti rimanenti: {ingredientCount}");
+        // Gli ingredienti sono infiniti, quindi non decrementiamo nulla
+        Debug.Log("📦 Ingredient consegnato dal box.");
     }
 }
