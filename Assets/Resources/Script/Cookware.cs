@@ -3,6 +3,10 @@ using UnityEngine;
 
 public class Cookware : MonoBehaviour
 {
+    [Header("Servings")]
+    public int maxServings = 3;
+    private int remainingServings = 0;
+
     public CookingToolType toolType;
     public Transform cookTarget;
 
@@ -62,13 +66,9 @@ public class Cookware : MonoBehaviour
         Ingredient ingredient = pickup.GetComponent<Ingredient>();
         if (ingredient == null || ingredient.cookedPrefab == null) return false;
         if (ingredient.compatibleTool != toolType) return false;
+        if (IngredientManager.Instance.IsIngredientActive(ingredient.ingredientID)) return false;
 
-        if (IngredientManager.Instance.IsIngredientActive(ingredient.ingredientID))
-        {
-            Debug.Log("❌ Questo ingrediente è già attivo in un'altra cookware.");
-            return false;
-        }
-
+        // Copia dati "logici" dell'ingrediente
         currentIngredient = new GameObject("TempIngredient").AddComponent<Ingredient>();
         currentIngredient.compatibleTool = ingredient.compatibleTool;
         currentIngredient.cookedPrefab = ingredient.cookedPrefab;
@@ -79,7 +79,6 @@ public class Cookware : MonoBehaviour
         Destroy(pickup.gameObject);
         targetCookTime = currentIngredient.cookTime;
 
-
         currentCookingInstance = Instantiate(
             ingredient.cookedPrefab,
             cookTarget.position,
@@ -87,15 +86,18 @@ public class Cookware : MonoBehaviour
             cookTarget
         );
 
+        // ✅ qui, dopo aver iniziato davvero la cottura
+        remainingServings = maxServings;
+
         isCooking = true;
         timer = 0f;
 
-        if (loopAudioSource != null && loopSound != null)
-            loopAudioSource.Play();
+        if (loopAudioSource != null && loopSound != null) loopAudioSource.Play();
 
-        IngredientManager.Instance.RegisterIngredient(ingredient.ingredientID);
+        IngredientManager.Instance.RegisterIngredient(currentIngredient.ingredientID);
         return true;
     }
+
 
     void OnCookComplete()
     {
@@ -125,6 +127,8 @@ public class Cookware : MonoBehaviour
 
     public void ClearCookedIngredient()
     {
+        remainingServings = 0;
+
         if (currentIngredient != null)
             IngredientManager.Instance.UnregisterIngredient(currentIngredient.ingredientID);
 
@@ -150,8 +154,20 @@ public class Cookware : MonoBehaviour
 
     public Ingredient GetCurrentIngredient()
     {
-        return isCooking ? null : currentIngredient;
+        return (!isCooking && currentCookingInstance != null && remainingServings > 0) ? currentIngredient : null;
     }
+
+    public bool ConsumeServing()
+    {
+        if (remainingServings <= 0) return false;
+
+        remainingServings--;
+        if (remainingServings == 0)
+            ClearCookedIngredient();
+
+        return true;
+    }
+
 
     public void OnPlacedInReceiver() { }
 }

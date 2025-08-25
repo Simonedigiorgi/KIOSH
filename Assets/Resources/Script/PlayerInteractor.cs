@@ -65,7 +65,15 @@ public class PlayerInteractor : MonoBehaviour
             return;
         }
 
-        // Se è un pacco
+        // 🍽 Interagisce con il distributore di piatti
+        DishDispenser dispenser = currentTarget.GetComponent<DishDispenser>();
+        if (dispenser != null)
+        {
+            dispenser.TryGiveDishToPlayer(this);
+            return;
+        }
+
+        // 📦 Se è un pacco di ingredienti
         PackageBox box = currentTarget.GetComponent<PackageBox>();
         if (box != null)
         {
@@ -76,7 +84,38 @@ public class PlayerInteractor : MonoBehaviour
             }
         }
 
-        // Se è un oggetto prendibile
+        // 📥 Se è un ObjectReceiver, lo uso per posizionare un oggetto
+        ObjectReceiver receiver = currentTarget.GetComponent<ObjectReceiver>();
+        if (receiver != null && IsHoldingObject())
+        {
+            if (receiver.CanAccept(heldPickup))
+            {
+                receiver.Place(heldPickup);
+                return;
+            }
+        }
+
+        // 📦 Inserimento piatto nel delivery box
+        DeliveryBox deliveryBox = currentTarget.GetComponent<DeliveryBox>();
+        if (deliveryBox != null && IsHoldingObject() && heldPickup.type == PickupType.Dish)
+        {
+            deliveryBox.TryInsertDish(heldPickup);
+            ClearHeld();
+            return;
+        }
+
+        // 🚀 Spedizione tramite pulsante del delivery box
+        if (currentTarget.name == "DeliveryButton") // oppure usa tag
+        {
+            DeliveryBox parentBox = currentTarget.GetComponentInParent<DeliveryBox>();
+            if (parentBox != null)
+            {
+                parentBox.OnDeliveryButtonClick();
+                return;
+            }
+        }
+
+        // 🧲 Prova a prendere un oggetto prendibile
         PickupObject pickup = currentTarget.GetComponent<PickupObject>();
         if (pickup == null)
             pickup = currentTarget.GetComponentInParent<PickupObject>();
@@ -98,12 +137,11 @@ public class PlayerInteractor : MonoBehaviour
             Debug.Log("❌ Oggetto non ha PickupObject.");
         }
     }
-
     void TryUseHeldObject()
     {
         if (currentTarget == null || heldPickup == null) return;
 
-        // 🔄 Chiama InteractWith() se il pickup lo supporta
+        // 🔄 Chiama InteractWith() se il pickup lo supporta (es. DishPickup)
         if (heldPickup.InteractWith(currentTarget))
         {
             return;
@@ -120,7 +158,7 @@ public class PlayerInteractor : MonoBehaviour
             }
         }
 
-        // 🔄 Altro receiver (es. tavolo, contenitori)
+        // 📥 Posizionare l’oggetto in un ObjectReceiver
         ObjectReceiver receiver = currentTarget.GetComponent<ObjectReceiver>();
         if (receiver != null && receiver.CanAccept(heldPickup))
         {
@@ -128,7 +166,29 @@ public class PlayerInteractor : MonoBehaviour
             ClearHeld();
             return;
         }
+
+        // 📦 Inserimento piatto nel delivery box
+        DeliveryBox deliveryBox = currentTarget.GetComponent<DeliveryBox>();
+        if (deliveryBox != null && heldPickup.type == PickupType.Dish)
+        {
+            deliveryBox.TryInsertDish(heldPickup);
+            ClearHeld();
+            return;
+        }
+
+        // 🚀 Spedizione tramite pulsante del delivery box
+        if (currentTarget.name == "DeliveryButton") // oppure usa tag
+        {
+            DeliveryBox parentBox = currentTarget.GetComponentInParent<DeliveryBox>();
+            if (parentBox != null)
+            {
+                parentBox.OnDeliveryButtonClick();
+                return;
+            }
+        }
     }
+
+
 
 
     public void PickUp(PickupObject pickup)
