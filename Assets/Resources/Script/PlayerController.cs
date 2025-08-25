@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
@@ -19,6 +19,8 @@ public class PlayerController : MonoBehaviour
     private Vector3 velocity;
     private bool isGrounded;
 
+    private bool controlsEnabled = true;   // 👈 nuovo
+
     void Start()
     {
         controller = GetComponent<CharacterController>();
@@ -35,6 +37,8 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        if (!controlsEnabled) return;   // 👈 blocca del tutto movimento+look quando sei in board
+
         HandleMovement();
         HandleCameraRotation();
         ApplyGravity();
@@ -56,7 +60,7 @@ public class PlayerController : MonoBehaviour
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
 
-        // Rotazione verticale (guardare su/gi�)
+        // Rotazione verticale (guardare su/giù)
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -80f, 80f);
 
@@ -66,20 +70,31 @@ public class PlayerController : MonoBehaviour
         transform.Rotate(Vector3.up * mouseX);
     }
 
-    // Applica la gravit� al personaggio
+    // Applica la gravità al personaggio
     void ApplyGravity()
     {
-        // Controlla se il personaggio � a terra
+        // Controlla se il personaggio è a terra
         isGrounded = controller.isGrounded;
 
         if (isGrounded && velocity.y < 0)
         {
-            // Reimposta la velocit� verticale se a terra
+            // Reimposta la velocità verticale se a terra
             velocity.y = -2f;
         }
 
-        // Applica gravit�
+        // Applica gravità
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
+    }
+
+
+    public void SetControlsEnabled(bool enabled)  // 👈 nuovo
+    {
+        controlsEnabled = enabled;
+        if (!enabled)
+        {
+            // opzionale: reset velocità per evitare “strascico”
+            velocity = Vector3.zero;
+        }
     }
 }

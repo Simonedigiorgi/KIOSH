@@ -2,88 +2,71 @@
 
 public class BulletinInteraction : MonoBehaviour
 {
-    public Transform cameraTargetPosition;
-    public Transform playerCamera;
-    public float cameraMoveSpeed = 5f;
+    [Header("Refs")]
+    public Transform cameraTargetPosition; // pivot davanti al monitor
+    public Camera playerCamera;            // Main Camera
     public CrosshairManager crosshairManager;
     public BulletinController bulletinController;
+    public PlayerController playerController;
 
-    private Vector3 originalCamPosition;
-    private Quaternion originalCamRotation;
+    // Backup camera (parent + posa locale)
+    private Transform originalCamParent;
+    private Vector3 originalLocalPos;
+    private Quaternion originalLocalRot;
 
     private bool isInteracting = false;
-    private bool hasEntered = false;
 
-    private PlayerInteractor playerInteractor;
-
-    void Start()
+    public void EnterInteraction()
     {
-        playerInteractor = FindObjectOfType<PlayerInteractor>();
-    }
-
-    void OnEnable()
-    {
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-    }
-
-    void Update()
-    {
-        if (!isInteracting && Input.GetKeyDown(KeyCode.E) && IsLookingAtPanel())
+        if (isInteracting) return;
+        if (playerCamera == null || cameraTargetPosition == null || playerController == null || bulletinController == null)
         {
-            if (!playerInteractor.IsHoldingObject())
-            {
-                EnterInteraction();
-            }
+            Debug.LogError("[BulletinInteraction] Riferimenti mancanti: assegna Camera/Target/PlayerController/BulletinController.");
+            return;
         }
 
-        if (isInteracting && Input.GetKeyDown(KeyCode.Escape))
-        {
-            ExitInteraction();
-        }
-    }
+        // 1) disabilita davvero il controller PRIMA di toccare la camera
+        playerController.SetControlsEnabled(false);
+        if (crosshairManager != null) crosshairManager.SetInteracting(true);
 
-    bool IsLookingAtPanel()
-    {
-        return playerInteractor.currentTarget == this.gameObject;
-    }
+        // 2) salva parent+posa locali
+        originalCamParent = playerCamera.transform.parent;
+        originalLocalPos = playerCamera.transform.localPosition;
+        originalLocalRot = playerCamera.transform.localRotation;
 
-    void EnterInteraction()
-    {
-        if (hasEntered) return;
+        // 3) re-parent al target e azzera local pose → combacia al millimetro
+        playerCamera.transform.SetParent(cameraTargetPosition, false);
+        playerCamera.transform.localPosition = Vector3.zero;
+        playerCamera.transform.localRotation = Quaternion.identity;
+
+        // 4) avvia UI (passiamo chi ha aperto, così la UI può richiudere correttamente)
+        bulletinController.EnterInteraction(this);
+
+        // 1) costruisci il menù in base allo stato attuale del box
+        var adapter = GetComponentInChildren<DeliveryBulletinAdapter>(true);
+        if (adapter != null) adapter.RefreshMenu();
+
+        // 2) poi apri la UI
+        bulletinController.EnterInteraction(this);
 
         isInteracting = true;
-        hasEntered = true;
 
-        originalCamPosition = playerCamera.position;
-        originalCamRotation = playerCamera.rotation;
-
-        FindObjectOfType<PlayerController>().enabled = false;
-        crosshairManager.SetInteracting(true);
-
-        playerCamera.position = cameraTargetPosition.position;
-        playerCamera.rotation = cameraTargetPosition.rotation;
-
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-
-        bulletinController.EnterInteraction();
+        isInteracting = true;
     }
 
     public void ExitInteraction()
     {
+        if (!isInteracting) return;
+
+        // 1) ripristina parent+posa locale della camera
+        playerCamera.transform.SetParent(originalCamParent, false);
+        playerCamera.transform.localPosition = originalLocalPos;
+        playerCamera.transform.localRotation = originalLocalRot;
+
+        // 2) riabilita il controller DOPO aver ripristinato la camera
+        playerController.SetControlsEnabled(true);
+        if (crosshairManager != null) crosshairManager.SetInteracting(false);
+
         isInteracting = false;
-        hasEntered = false;
-
-        playerCamera.position = originalCamPosition;
-        playerCamera.rotation = originalCamRotation;
-
-        FindObjectOfType<PlayerController>().enabled = true;
-        crosshairManager.SetInteracting(false);
-
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
-
-        bulletinController.ForceBackToIntro();
     }
 }

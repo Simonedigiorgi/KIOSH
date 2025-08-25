@@ -2,6 +2,7 @@
 using TMPro;
 using UnityEngine.UI;
 using System.Collections.Generic;
+using UnityEngine.Events; // ✅ necessario per UnityEvent
 
 public class BulletinController : MonoBehaviour
 {
@@ -12,7 +13,7 @@ public class BulletinController : MonoBehaviour
     private List<MenuOption> rootOptions; // riferimento al main menu originale
     private Stack<List<MenuOption>> menuHistory = new Stack<List<MenuOption>>();
     private List<Button> activeButtons = new List<Button>();
-
+    private BulletinInteraction activeInteraction;
 
     [Header("Panels")]
     public GameObject introPanel;
@@ -41,11 +42,16 @@ public class BulletinController : MonoBehaviour
     public class MenuOption
     {
         public string title;
-        public enum MenuAction { OpenSubmenu, ShowReading }
+
+        // ✅ aggiunto "Invoke"
+        public enum MenuAction { OpenSubmenu, ShowReading, Invoke }
         public MenuAction action;
 
-        [TextArea(3, 10)] public List<string> readingPages;
-        public List<MenuOption> subOptions;
+        [TextArea(3, 10)] public List<string> readingPages;   // usato se ShowReading
+        public List<MenuOption> subOptions;                   // usato se OpenSubmenu
+
+        // ✅ aggiunto: azione da eseguire quando la voce è di tipo Invoke
+        public UnityEvent onInvoke;
     }
 
     void Start()
@@ -78,16 +84,16 @@ public class BulletinController : MonoBehaviour
             case MenuState.Reading:
                 if (Input.GetKeyDown(KeyCode.A)) PreviousPage();
                 if (Input.GetKeyDown(KeyCode.D)) NextPage();
-                // ⬇️ Aggiungi questa riga per gestire Enter
                 if (Input.GetKeyDown(KeyCode.Return)) HandleReadingMenuSelect();
                 break;
         }
     }
 
-    public void EnterInteraction()
+    public void EnterInteraction(BulletinInteraction interaction)
     {
-        if (hasEntered) return;
+        activeInteraction = interaction;
         isInteracting = true;
+        hasEntered = false;
         ShowIntro();
     }
 
@@ -97,11 +103,7 @@ public class BulletinController : MonoBehaviour
         hasEntered = false;
         HideAllPanels();
         ShowIntro();
-
-        // 🔁 Ritorna il controllo al giocatore
-        FindObjectOfType<BulletinInteraction>()?.ExitInteraction();
     }
-
 
     void ShowIntro()
     {
@@ -118,7 +120,6 @@ public class BulletinController : MonoBehaviour
         ShowDynamicMenu(mainOptions);
     }
 
-
     void ShowDynamicMenu(List<MenuOption> options)
     {
         currentState = MenuState.General;
@@ -126,7 +127,7 @@ public class BulletinController : MonoBehaviour
         generalMenuPanel.SetActive(true);
         commandPanel.SetActive(true);
 
-        currentOptions = options;
+        currentOptions = options ?? new List<MenuOption>(); // ✅ safety
         currentMenuIndex = 0;
 
         // Pulisce vecchi bottoni
@@ -135,10 +136,10 @@ public class BulletinController : MonoBehaviour
 
         activeButtons.Clear();
 
-        for (int i = 0; i < options.Count; i++)
+        for (int i = 0; i < currentOptions.Count; i++)
         {
             int index = i;
-            MenuOption opt = options[i];
+            MenuOption opt = currentOptions[i];
             Button newBtn = Instantiate(menuButtonTemplate, generalMenuContainer);
             newBtn.gameObject.SetActive(true);
             newBtn.GetComponentInChildren<TMP_Text>().text = opt.title;
@@ -160,7 +161,6 @@ public class BulletinController : MonoBehaviour
 
         StartCoroutine(DelayedHighlight());
     }
-
 
     System.Collections.IEnumerator DelayedHighlight()
     {
@@ -186,21 +186,29 @@ public class BulletinController : MonoBehaviour
         switch (selected.action)
         {
             case MenuOption.MenuAction.OpenSubmenu:
-                menuHistory.Push(currentOptions); // Salva lo stato attuale prima di entrare nel sottomenu
+                menuHistory.Push(currentOptions);
                 ShowDynamicMenu(selected.subOptions);
                 break;
 
             case MenuOption.MenuAction.ShowReading:
                 ShowCustomReading(selected.readingPages);
                 break;
+
+            case MenuOption.MenuAction.Invoke: // ✅ nuovo caso supportato
+                if (selected.onInvoke != null)
+                    selected.onInvoke.Invoke();
+                // dopo l’azione, ricarica il menu (aggiorna UI)
+                ShowGeneralMenu();
+                break;
         }
     }
+
     void ShowCustomReading(List<string> pages)
     {
         // ✅ Salva il menu attuale nello stack per tornare indietro
         menuHistory.Push(currentOptions);
 
-        currentPages = pages.ToArray();
+        currentPages = (pages != null) ? pages.ToArray() : new string[0];
         currentPage = 0;
 
         leftButton.gameObject.SetActive(currentPages.Length > 1);
@@ -209,7 +217,6 @@ public class BulletinController : MonoBehaviour
         UpdatePage();
         ShowReading();
     }
-
 
     void ShowReading()
     {
@@ -228,16 +235,17 @@ public class BulletinController : MonoBehaviour
         }
     }
 
-
     void UpdatePage()
     {
         if (currentPages != null && currentPages.Length > 0)
             bulletinText.text = currentPages[currentPage];
+        else
+            bulletinText.text = string.Empty;
     }
 
     void NextPage()
     {
-        if (currentPage < currentPages.Length - 1)
+        if (currentPages != null && currentPage < currentPages.Length - 1)
         {
             currentPage++;
             UpdatePage();
@@ -246,7 +254,7 @@ public class BulletinController : MonoBehaviour
 
     void PreviousPage()
     {
-        if (currentPage > 0)
+        if (currentPages != null && currentPage > 0)
         {
             currentPage--;
             UpdatePage();
@@ -260,6 +268,7 @@ public class BulletinController : MonoBehaviour
         readingGroup.SetActive(false);
         commandPanel.SetActive(false);
     }
+
     void HandleMenuNavigation()
     {
         int count = activeButtons.Count;
@@ -302,7 +311,11 @@ public class BulletinController : MonoBehaviour
             case MenuState.General:
                 if (currentOptions == rootOptions)
                 {
-                    ExitInteraction(); // Sei nel menu principale → esci
+                    // Chiudi UI
+                    ExitInteraction();
+                    // Ripristina camera/player
+                    activeInteraction?.ExitInteraction();
+                    activeInteraction = null;
                 }
                 else if (menuHistory.Count > 0)
                 {
@@ -319,12 +332,14 @@ public class BulletinController : MonoBehaviour
                 }
                 else
                 {
-                    ShowGeneralMenu(); // Fallback di sicurezza
+                    ShowGeneralMenu();
                 }
                 break;
 
             default:
-                ExitInteraction(); // fallback
+                ExitInteraction();
+                activeInteraction?.ExitInteraction();
+                activeInteraction = null;
                 break;
         }
     }
@@ -341,5 +356,4 @@ public class BulletinController : MonoBehaviour
             OnBackMenuPressed();
         }
     }
-
 }
