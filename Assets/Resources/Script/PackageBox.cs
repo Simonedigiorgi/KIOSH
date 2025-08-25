@@ -15,6 +15,19 @@ public class PackageBox : MonoBehaviour
     {
         if (!isPlaced || player.IsHoldingObject()) return;
 
+        Ingredient ing = ingredientPrefab.GetComponent<Ingredient>();
+        if (ing == null)
+        {
+            Debug.LogError("❌ Il prefab non ha un componente Ingredient!");
+            return;
+        }
+
+        if (IngredientManager.Instance.IsIngredientActive(ing.ingredientID))
+        {
+            Debug.Log($"⛔ Ingrediente '{ing.ingredientID}' già attivo.");
+            return;
+        }
+
         GameObject instance = Instantiate(
             ingredientPrefab,
             player.handPivot.position,
@@ -41,8 +54,8 @@ public class PackageBox : MonoBehaviour
         }
 
         player.ReceiveExternalPickup(pickup);
-
-        // Gli ingredienti sono infiniti, quindi non decrementiamo nulla
-        Debug.Log("📦 Ingredient consegnato dal box.");
     }
+
+
+
 }

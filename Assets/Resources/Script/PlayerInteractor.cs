@@ -103,16 +103,24 @@ public class PlayerInteractor : MonoBehaviour
     {
         if (currentTarget == null || heldPickup == null) return;
 
-        Cookware cookware = currentTarget.GetComponent<Cookware>();
-        if (cookware != null)
+        // 🔄 Chiama InteractWith() se il pickup lo supporta
+        if (heldPickup.InteractWith(currentTarget))
         {
-            if (cookware.TryAddIngredient(heldPickup))
+            return;
+        }
+
+        // 🥩 Caso classico: ingrediente da mettere in cookware
+        if (heldPickup.type == PickupType.Ingredient)
+        {
+            Cookware cookware = currentTarget.GetComponent<Cookware>();
+            if (cookware != null && cookware.TryAddIngredient(heldPickup))
             {
                 ClearHeld();
                 return;
             }
         }
 
+        // 🔄 Altro receiver (es. tavolo, contenitori)
         ObjectReceiver receiver = currentTarget.GetComponent<ObjectReceiver>();
         if (receiver != null && receiver.CanAccept(heldPickup))
         {
@@ -121,6 +129,7 @@ public class PlayerInteractor : MonoBehaviour
             return;
         }
     }
+
 
     public void PickUp(PickupObject pickup)
     {

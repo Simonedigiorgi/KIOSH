@@ -182,3 +182,5 @@ MonoBehaviour:
   compatibleTool: 1
   cookedPrefab: {fileID: 6770448299845117541, guid: 8be1cdc1d1abf4048876ee6dd938a56a, type: 3}
   cookTime: 5
+  ingredientID: Ingredient_DogMeat
+  dishPrefab: {fileID: 5480392534301735969, guid: e3ff35584c5bca94e824b9b18355c4c9, type: 3}

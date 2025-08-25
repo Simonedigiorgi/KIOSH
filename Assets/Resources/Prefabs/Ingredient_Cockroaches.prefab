@@ -182,3 +182,5 @@ MonoBehaviour:
   compatibleTool: 0
   cookedPrefab: {fileID: 6493490521897788228, guid: 0131e2de0d3dbd247a9b116411d6ac2e, type: 3}
   cookTime: 5
+  ingredientID: Ingredient_Cockroaches
+  dishPrefab: {fileID: 7669072816074226235, guid: f5b28f72b18fb9c46be3c1df3e1cb04c, type: 3}

@@ -41,4 +41,10 @@ public class PickupObject : MonoBehaviour
             rb.detectCollisions = true;
         }
     }
+
+    public virtual bool InteractWith(GameObject target)
+    {
+        return false;
+    }
+
 }

@@ -63,10 +63,22 @@ public class Cookware : MonoBehaviour
         if (ingredient == null || ingredient.cookedPrefab == null) return false;
         if (ingredient.compatibleTool != toolType) return false;
 
-        Destroy(pickup.gameObject);
+        if (IngredientManager.Instance.IsIngredientActive(ingredient.ingredientID))
+        {
+            Debug.Log("❌ Questo ingrediente è già attivo in un'altra cookware.");
+            return false;
+        }
 
-        currentIngredient = ingredient;
-        targetCookTime = ingredient.cookTime;
+        currentIngredient = new GameObject("TempIngredient").AddComponent<Ingredient>();
+        currentIngredient.compatibleTool = ingredient.compatibleTool;
+        currentIngredient.cookedPrefab = ingredient.cookedPrefab;
+        currentIngredient.cookTime = ingredient.cookTime;
+        currentIngredient.dishPrefab = ingredient.dishPrefab;
+        currentIngredient.ingredientID = ingredient.ingredientID;
+
+        Destroy(pickup.gameObject);
+        targetCookTime = currentIngredient.cookTime;
+
 
         currentCookingInstance = Instantiate(
             ingredient.cookedPrefab,
@@ -81,6 +93,7 @@ public class Cookware : MonoBehaviour
         if (loopAudioSource != null && loopSound != null)
             loopAudioSource.Play();
 
+        IngredientManager.Instance.RegisterIngredient(ingredient.ingredientID);
         return true;
     }
 
@@ -112,6 +125,9 @@ public class Cookware : MonoBehaviour
 
     public void ClearCookedIngredient()
     {
+        if (currentIngredient != null)
+            IngredientManager.Instance.UnregisterIngredient(currentIngredient.ingredientID);
+
         if (currentCookingInstance)
             Destroy(currentCookingInstance);
 
@@ -126,9 +142,15 @@ public class Cookware : MonoBehaviour
         }
     }
 
+
     public bool HasCookedIngredient()
     {
         return !isCooking && currentCookingInstance != null;
+    }
+
+    public Ingredient GetCurrentIngredient()
+    {
+        return isCooking ? null : currentIngredient;
     }
 
     public void OnPlacedInReceiver() { }
