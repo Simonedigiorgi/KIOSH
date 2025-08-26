@@ -25,10 +25,8 @@ public class BulletinController : MonoBehaviour
     private BulletinInteraction activeInteraction;
 
     [Header("UI")]
-    public GameObject listPanel;              // ha VerticalLayoutGroup + ContentSizeFitter
-    public Transform listContainer;           // se null, usa listPanel.transform
-    public TMP_Text lineTemplate;             // prefab TMP_Text (DISATTIVATO in scena)
-    public VerticalLayoutGroup listLayout;    // (opzionale) VerticalLayoutGroup del ListPanel da forzare
+    public GameObject listPanel;        // ha VerticalLayoutGroup + ContentSizeFitter
+    public TMP_Text lineTemplate;       // prefab TMP_Text (DISATTIVATO in scena)
 
     [Header("Colors")]
     public Color labelColor = new(0.75f, 0.9f, 1f);
@@ -44,6 +42,11 @@ public class BulletinController : MonoBehaviour
     public KeyCode downKey = KeyCode.S;
     public KeyCode prevPageKey = KeyCode.A;
     public KeyCode nextPageKey = KeyCode.D;
+
+    [Header("Audio")]
+    public AudioClip sfxMove;
+    public AudioClip sfxConfirm;
+    private AudioSource audioSource;
 
     // Reading
     private string[] currentPages;
@@ -71,39 +74,34 @@ public class BulletinController : MonoBehaviour
 
     void Awake()
     {
-        if (listLayout != null)
-        {
-            listLayout.reverseArrangement = false;
-            listLayout.childAlignment = TextAnchor.UpperLeft;
+        // AudioSource dal GO (se manca, lo aggiungo silenziosamente)
+        audioSource = GetComponent<AudioSource>();
+        if (!audioSource) audioSource = gameObject.AddComponent<AudioSource>();
 
-            // LAYOUT: il layout controlla dimensioni dei figli
-            listLayout.childControlWidth = true;
-            listLayout.childControlHeight = true;   // ✅ PRIMA era false: va messo a true!
-
-            listLayout.childForceExpandWidth = true;
-            listLayout.childForceExpandHeight = false;
-        }
+        // ListPanel obbligatorio
+        if (!listPanel)
+            Debug.LogError("[BulletinController] Assegna ListPanel nel Inspector.");
     }
-
 
     void Update()
     {
         if (!isInteracting) return;
         if (Time.frameCount == openedAtFrame) return; // evita l’“E” del frame di apertura
 
-        if (Input.GetKeyDown(downKey)) MoveSelection(1);
-        if (Input.GetKeyDown(upKey)) MoveSelection(-1);
+        if (Input.GetKeyDown(downKey)) { MoveSelection(1); PlayMove(); }
+        if (Input.GetKeyDown(upKey)) { MoveSelection(-1); PlayMove(); }
 
         if (Input.GetKeyDown(confirmKey))
         {
+            PlayConfirm();
             if (state == MenuState.General) ConfirmGeneral();
             else ConfirmReading();
         }
 
         if (state == MenuState.Reading)
         {
-            if (Input.GetKeyDown(prevPageKey)) PreviousPage();
-            if (Input.GetKeyDown(nextPageKey)) NextPage();
+            if (Input.GetKeyDown(prevPageKey)) { PreviousPage(); PlayMove(); }
+            if (Input.GetKeyDown(nextPageKey)) { NextPage(); PlayMove(); }
         }
     }
 
@@ -115,7 +113,7 @@ public class BulletinController : MonoBehaviour
         openedAtFrame = Time.frameCount;
 
         menuHistory.Clear();
-        ShowMenu(mainOptions);
+        ShowMenu(mainOptions);          // 👈 menu iniziale subito visibile
     }
 
     public void ExitInteraction()
@@ -123,6 +121,9 @@ public class BulletinController : MonoBehaviour
         isInteracting = false;
         ClearList();
         if (listPanel) listPanel.SetActive(false);
+
+        // sicurezza: ignora gli input del frame corrente
+        openedAtFrame = Time.frameCount;
 
         activeInteraction?.ExitInteraction();
         activeInteraction = null;
@@ -148,7 +149,7 @@ public class BulletinController : MonoBehaviour
         currentMenuIndex = 0;
 
         BuildList(currentOptions, includeBack: true, onlyBack: false);
-        UpdateHighlight();
+        UpdateHighlight();              // 👈 subito evidenziato
     }
 
     private void ConfirmGeneral()
@@ -196,7 +197,7 @@ public class BulletinController : MonoBehaviour
 
         // Costruisci: corpo + Back
         ClearList();
-        Transform parent = GetContainer();
+        Transform parent = listPanel ? listPanel.transform : null;
         if (!parent || !lineTemplate) return;
 
         // 1) Corpo (multilinea, auto-height)
@@ -213,7 +214,7 @@ public class BulletinController : MonoBehaviour
         rt.pivot = new Vector2(0f, 1f);
         rt.sizeDelta = new Vector2(0f, 0f);
 
-        // 🔧 rimuovi qualunque LayoutElement ereditato dal prefab
+        // rimuovi qualunque LayoutElement ereditato dal prefab
         var le = readingBodyLine.GetComponent<LayoutElement>();
         if (le) Destroy(le);
 
@@ -227,22 +228,17 @@ public class BulletinController : MonoBehaviour
         currentMenuIndex = activeLines.Count - 1;
         UpdateHighlight();
 
-        // ✅ rebuild DOPO aver creato anche Back
+        // rebuild DOPO aver creato anche Back
         StartCoroutine(RebuildEndOfFrame());
     }
 
     private IEnumerator RebuildEndOfFrame()
     {
-        // aspetta la fine del frame per avere le mesh TMP aggiornate
         yield return new WaitForEndOfFrame();
-
         Canvas.ForceUpdateCanvases();
-
-        var root = (listPanel != null) ? listPanel.GetComponent<RectTransform>() : null;
-        if (root != null)
-            LayoutRebuilder.ForceRebuildLayoutImmediate(root);
+        if (listPanel)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(listPanel.GetComponent<RectTransform>());
     }
-
 
     private void ConfirmReading() => GoBack();
 
@@ -270,13 +266,11 @@ public class BulletinController : MonoBehaviour
     }
 
     // ===== COSTRUZIONE LISTA =====
-    private Transform GetContainer() => listContainer ? listContainer : (listPanel ? listPanel.transform : null);
-
     private void BuildList(List<MenuOption> options, bool includeBack, bool onlyBack)
     {
         ClearList();
 
-        var parent = GetContainer();
+        var parent = listPanel ? listPanel.transform : null;
         if (!parent || !lineTemplate) return;
 
         if (!onlyBack && options != null)
@@ -312,14 +306,13 @@ public class BulletinController : MonoBehaviour
         rt.pivot = new Vector2(0f, 1f);
         rt.sizeDelta = new Vector2(0f, 0f);
 
-        // ✅ IMPORTANTE: rimuovi qualsiasi LayoutElement del prefab (bloccherebbe l'altezza)
+        // rimuovi qualsiasi LayoutElement del prefab (bloccherebbe l'altezza)
         var le = t.GetComponent<LayoutElement>();
         if (le) Destroy(le);
 
         spawnedLines.Add(t);
         return t;
     }
-
 
     private void CreateSelectableLine(Transform parent, string text, MenuOption opt)
     {
@@ -345,9 +338,9 @@ public class BulletinController : MonoBehaviour
 
     private void ClearList()
     {
-        Transform parent = GetContainer();
-        if (parent)
+        if (listPanel)
         {
+            var parent = listPanel.transform;
             for (int i = parent.childCount - 1; i >= 0; i--)
                 Destroy(parent.GetChild(i).gameObject);
         }
@@ -393,19 +386,29 @@ public class BulletinController : MonoBehaviour
     {
         if (!readingBodyLine) return;
 
-        string txt = (currentPages != null && currentPages.Length > 0)
-            ? currentPages[currentPage]
-            : string.Empty;
+        string body = GetCurrentPageText();
 
-        readingBodyLine.text = txt;
+        // Prefisso "Pag. X/Y - " solo se più di 1 pagina
+        string prefix = (currentPages != null && currentPages.Length > 1)
+            ? $"Pag. {currentPage + 1}/{currentPages.Length} - "
+            : "";
 
-        // Aggiorna subito la mesh di TMP
+        readingBodyLine.text = prefix + body;
+
+        // aggiorna la mesh di TMP e il layout subito
         readingBodyLine.ForceMeshUpdate();
-
-        // Rebuild immediato del layout
         Canvas.ForceUpdateCanvases();
-        var root = (listPanel != null) ? listPanel.GetComponent<RectTransform>() : null;
-        if (root != null)
-            LayoutRebuilder.ForceRebuildLayoutImmediate(root);
+        if (listPanel)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(listPanel.GetComponent<RectTransform>());
+    }
+
+    private void PlayMove()
+    {
+        if (audioSource && sfxMove) audioSource.PlayOneShot(sfxMove);
+    }
+
+    private void PlayConfirm()
+    {
+        if (audioSource && sfxConfirm) audioSource.PlayOneShot(sfxConfirm);
     }
 }

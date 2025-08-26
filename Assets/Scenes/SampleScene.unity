@@ -1350,6 +1350,7 @@ MonoBehaviour:
   crosshairManager: {fileID: 1116718199}
   bulletinController: {fileID: 752855815}
   playerController: {fileID: 1016186865}
+  reopenCooldown: 0.2
 --- !u!65 &189525847
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -3459,6 +3460,7 @@ GameObject:
   - component: {fileID: 752855815}
   - component: {fileID: 752855814}
   - component: {fileID: 752855819}
+  - component: {fileID: 752855820}
   m_Layer: 5
   m_Name: BulletinCanvas
   m_TagString: Untagged
@@ -3510,9 +3512,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   mainOptions: []
   listPanel: {fileID: 1299146213}
-  listContainer: {fileID: 1299146214}
   lineTemplate: {fileID: 4397572817798802823, guid: 301bccc7de550bc43a0c2caff16c85fb, type: 3}
-  listLayout: {fileID: 0}
   labelColor: {r: 0.75, g: 0.9, b: 1, a: 1}
   selectableNormalColor: {r: 1, g: 1, b: 1, a: 1}
   selectableHighlightColor: {r: 0, g: 1, b: 0, a: 1}
@@ -3522,6 +3522,8 @@ MonoBehaviour:
   downKey: 115
   prevPageKey: 97
   nextPageKey: 100
+  sfxMove: {fileID: 8300000, guid: 6d5a19d219b395e4489108b371e08f54, type: 3}
+  sfxConfirm: {fileID: 8300000, guid: 33b91c9785af64e48ad9aae455ca9cda, type: 3}
 --- !u!114 &752855816
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3602,6 +3604,103 @@ MonoBehaviour:
   msgDoorOpen: "Sportello aperto \u2014 chiudere per spedire."
   msgInsertDish: Inserire un piatto completo.
   progressFormat: 'Piatto spediti: {0}/{1}'
+--- !u!82 &752855820
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 752855812}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 0.6
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0.8
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &779036507
 GameObject:
   m_ObjectHideFlags: 0
@@ -4364,6 +4463,7 @@ GameObject:
   - component: {fileID: 1016505097}
   - component: {fileID: 1016505096}
   - component: {fileID: 1016505100}
+  - component: {fileID: 1016505101}
   m_Layer: 5
   m_Name: BulletinCanvas
   m_TagString: Untagged
@@ -4433,9 +4533,7 @@ MonoBehaviour:
       m_PersistentCalls:
         m_Calls: []
   listPanel: {fileID: 2022851332}
-  listContainer: {fileID: 2022851333}
   lineTemplate: {fileID: 4397572817798802823, guid: 301bccc7de550bc43a0c2caff16c85fb, type: 3}
-  listLayout: {fileID: 0}
   labelColor: {r: 0.75, g: 0.9, b: 1, a: 1}
   selectableNormalColor: {r: 1, g: 1, b: 1, a: 1}
   selectableHighlightColor: {r: 0, g: 1, b: 0, a: 1}
@@ -4445,6 +4543,8 @@ MonoBehaviour:
   downKey: 115
   prevPageKey: 97
   nextPageKey: 100
+  sfxMove: {fileID: 8300000, guid: 6d5a19d219b395e4489108b371e08f54, type: 3}
+  sfxConfirm: {fileID: 8300000, guid: 33b91c9785af64e48ad9aae455ca9cda, type: 3}
 --- !u!114 &1016505097
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4516,6 +4616,103 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1016505094}
   m_CullTransparentMesh: 1
+--- !u!82 &1016505101
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1016505094}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 0
+  m_Volume: 0.6
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0.8
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &1036416712
 GameObject:
   m_ObjectHideFlags: 0
@@ -4662,6 +4859,7 @@ MonoBehaviour:
   crosshairManager: {fileID: 1116718199}
   bulletinController: {fileID: 1016505096}
   playerController: {fileID: 1016186865}
+  reopenCooldown: 0.2
 --- !u!65 &1041914703
 BoxCollider:
   m_ObjectHideFlags: 0
