@@ -1,31 +1,34 @@
-﻿using System.Collections.Generic;
+﻿using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.UI;
 
 public class BulletinController : MonoBehaviour
 {
     [Header("Root Options (fornite da Adapter)")]
     public List<MenuOption> mainOptions;
 
-    // stato menu
+    // Stato / stack
     private List<MenuOption> currentOptions;
     private readonly Stack<List<MenuOption>> menuHistory = new Stack<List<MenuOption>>();
 
-    // righe UI generate (selezionabili + label + back)
-    private readonly List<TMP_Text> spawnedLines = new List<TMP_Text>();
-    private readonly List<TMP_Text> activeLines = new List<TMP_Text>();   // solo selezionabili + back
-    private readonly List<MenuOption> selectableOptions = new List<MenuOption>(); // 1:1 con voci selezionabili
-    private int currentMenuIndex = 0; // indice nell'elenco activeLines
+    // Righe generate
+    private readonly List<TMP_Text> spawnedLines = new List<TMP_Text>();  // tutte le istanze
+    private readonly List<TMP_Text> activeLines = new List<TMP_Text>();  // solo selezionabili (+ Back)
+    private readonly List<MenuOption> selectableOptions = new List<MenuOption>(); // 1:1 con activeLines (tranne Back)
+    private int currentMenuIndex = 0;
 
-    // bridge verso l’interazione camera/player
+    // Bridge verso interazione player/camera
+    private TMP_Text readingBodyLine;   // riga multilinea del reading
     private BulletinInteraction activeInteraction;
 
     [Header("UI")]
-    public GameObject listPanel;        // pannello con VerticalLayoutGroup
-    public Transform listContainer;     // se null, usa listPanel.transform
-    public TMP_Text lineTemplate;       // prefab di una riga (TMP_Text) disattivato nella scena
-    public TMP_Text readingText;        // testo del reading (deve avere LayoutElement con FlexibleHeight=1)
+    public GameObject listPanel;              // ha VerticalLayoutGroup + ContentSizeFitter
+    public Transform listContainer;           // se null, usa listPanel.transform
+    public TMP_Text lineTemplate;             // prefab TMP_Text (DISATTIVATO in scena)
+    public VerticalLayoutGroup listLayout;    // (opzionale) VerticalLayoutGroup del ListPanel da forzare
 
     [Header("Colors")]
     public Color labelColor = new(0.75f, 0.9f, 1f);
@@ -42,11 +45,11 @@ public class BulletinController : MonoBehaviour
     public KeyCode prevPageKey = KeyCode.A;
     public KeyCode nextPageKey = KeyCode.D;
 
-    // reading
+    // Reading
     private string[] currentPages;
     private int currentPage = 0;
 
-    // anti-doppio input (E del frame di apertura)
+    // Anti doppio input
     private int openedAtFrame = -1;
 
     private enum MenuState { General, Reading }
@@ -54,10 +57,6 @@ public class BulletinController : MonoBehaviour
 
     private bool isInteracting = false;
     public bool IsOpen => isInteracting;
-
-    // cache parent originale del readingText (se lo spostiamo nel listContainer)
-    private Transform readingOrigParent;
-    private int readingOrigSibling = -1;
 
     [System.Serializable]
     public class MenuOption
@@ -70,12 +69,27 @@ public class BulletinController : MonoBehaviour
         public UnityEvent onInvoke;                         // se Invoke
     }
 
+    void Awake()
+    {
+        if (listLayout != null)
+        {
+            listLayout.reverseArrangement = false;
+            listLayout.childAlignment = TextAnchor.UpperLeft;
+
+            // LAYOUT: il layout controlla dimensioni dei figli
+            listLayout.childControlWidth = true;
+            listLayout.childControlHeight = true;   // ✅ PRIMA era false: va messo a true!
+
+            listLayout.childForceExpandWidth = true;
+            listLayout.childForceExpandHeight = false;
+        }
+    }
+
+
     void Update()
     {
         if (!isInteracting) return;
-
-        // evita che l’E di apertura confermi subito qualcosa
-        if (Time.frameCount == openedAtFrame) return;
+        if (Time.frameCount == openedAtFrame) return; // evita l’“E” del frame di apertura
 
         if (Input.GetKeyDown(downKey)) MoveSelection(1);
         if (Input.GetKeyDown(upKey)) MoveSelection(-1);
@@ -107,17 +121,11 @@ public class BulletinController : MonoBehaviour
     public void ExitInteraction()
     {
         isInteracting = false;
-
         ClearList();
-        // rimettiamo il readingText al suo posto e nascondiamo
-        RestoreReadingParent();
-        if (readingText) readingText.gameObject.SetActive(false);
+        if (listPanel) listPanel.SetActive(false);
 
-        if (activeInteraction != null)
-        {
-            activeInteraction.ExitInteraction(); // restituisce camera/controlli
-            activeInteraction = null;
-        }
+        activeInteraction?.ExitInteraction();
+        activeInteraction = null;
     }
 
     public void SetRootOptions(List<MenuOption> options, bool refreshIfOpen = true)
@@ -134,15 +142,11 @@ public class BulletinController : MonoBehaviour
     private void ShowMenu(List<MenuOption> options)
     {
         state = MenuState.General;
-
         if (listPanel) listPanel.SetActive(true);
 
-        // assicuriamoci che il readingText non resti nel container in modalità menu
-        RestoreReadingParent();
-        if (readingText) readingText.gameObject.SetActive(false);
-
         currentOptions = options ?? new List<MenuOption>();
-        currentMenuIndex = 0; // sempre dalla prima voce
+        currentMenuIndex = 0;
+
         BuildList(currentOptions, includeBack: true, onlyBack: false);
         UpdateHighlight();
     }
@@ -151,14 +155,10 @@ public class BulletinController : MonoBehaviour
     {
         if (activeLines.Count == 0) return;
 
-        // l'ultima riga è Back
-        if (currentMenuIndex == activeLines.Count - 1)
-        {
-            GoBack();
-            return;
-        }
+        // ultima riga = Back
+        if (currentMenuIndex == activeLines.Count - 1) { GoBack(); return; }
 
-        int optIndex = currentMenuIndex; // mappa 1:1 con selectableOptions
+        int optIndex = currentMenuIndex; // 1:1 con selectableOptions
         if (optIndex < 0 || optIndex >= selectableOptions.Count) return;
 
         var selected = selectableOptions[optIndex];
@@ -175,13 +175,11 @@ public class BulletinController : MonoBehaviour
 
             case MenuOption.MenuAction.Invoke:
                 selected.onInvoke?.Invoke();
-                // dopo l’azione torno alla root (aggiorno eventuali contatori)
-                menuHistory.Clear();
+                menuHistory.Clear();         // torna alla root (aggiorna contatori ecc.)
                 ShowMenu(mainOptions);
                 break;
 
             case MenuOption.MenuAction.Label:
-                // non selezionabile
                 break;
         }
     }
@@ -194,37 +192,62 @@ public class BulletinController : MonoBehaviour
         currentPages = (pages != null) ? pages.ToArray() : new string[0];
         currentPage = 0;
 
-        // porta il readingText dentro il listContainer come PRIMO elemento
-        Transform parent = listContainer ? listContainer : (listPanel ? listPanel.transform : null);
-        if (readingText && parent)
-        {
-            if (!readingOrigParent)    // cache una sola volta
-            {
-                readingOrigParent = readingText.transform.parent;
-                readingOrigSibling = readingText.transform.GetSiblingIndex();
-            }
-            readingText.transform.SetParent(parent, false);
-            readingText.transform.SetSiblingIndex(0); // in alto
-            readingText.gameObject.SetActive(true);
-        }
+        if (listPanel) listPanel.SetActive(true);
 
-        UpdatePage();
+        // Costruisci: corpo + Back
+        ClearList();
+        Transform parent = GetContainer();
+        if (!parent || !lineTemplate) return;
 
-        // in reading mostriamo solo Back (ed è in fondo perché aggiunto dopo il testo)
-        BuildList(null, includeBack: true, onlyBack: true);
+        // 1) Corpo (multilinea, auto-height)
+        readingBodyLine = Instantiate(lineTemplate, parent);
+        readingBodyLine.gameObject.SetActive(true);
+        readingBodyLine.alignment = TextAlignmentOptions.TopLeft;
+        readingBodyLine.enableWordWrapping = true;
+        readingBodyLine.overflowMode = TextOverflowModes.Overflow;
+
+        // stretch orizzontale
+        var rt = readingBodyLine.rectTransform;
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(0f, 1f);
+        rt.sizeDelta = new Vector2(0f, 0f);
+
+        // 🔧 rimuovi qualunque LayoutElement ereditato dal prefab
+        var le = readingBodyLine.GetComponent<LayoutElement>();
+        if (le) Destroy(le);
+
+        // testo + calcolo altezza (TMP preferred)
+        UpdateReadingBodyTextAndHeight();
+
+        // 2) Back sempre in fondo
+        CreateBackLine(parent);
+
+        // selezione di default sul Back (ultima voce)
         currentMenuIndex = activeLines.Count - 1;
         UpdateHighlight();
+
+        // ✅ rebuild DOPO aver creato anche Back
+        StartCoroutine(RebuildEndOfFrame());
     }
+
+    private IEnumerator RebuildEndOfFrame()
+    {
+        // aspetta la fine del frame per avere le mesh TMP aggiornate
+        yield return new WaitForEndOfFrame();
+
+        Canvas.ForceUpdateCanvases();
+
+        var root = (listPanel != null) ? listPanel.GetComponent<RectTransform>() : null;
+        if (root != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(root);
+    }
+
 
     private void ConfirmReading() => GoBack();
 
-    private void UpdatePage()
-    {
-        if (!readingText) return;
-        readingText.text = (currentPages != null && currentPages.Length > 0)
-            ? currentPages[currentPage]
-            : string.Empty;
-    }
+    private string GetCurrentPageText()
+        => (currentPages != null && currentPages.Length > 0) ? currentPages[currentPage] : string.Empty;
 
     private void NextPage()
     {
@@ -247,57 +270,88 @@ public class BulletinController : MonoBehaviour
     }
 
     // ===== COSTRUZIONE LISTA =====
+    private Transform GetContainer() => listContainer ? listContainer : (listPanel ? listPanel.transform : null);
+
     private void BuildList(List<MenuOption> options, bool includeBack, bool onlyBack)
     {
         ClearList();
 
-        Transform parent = listContainer ? listContainer : (listPanel ? listPanel.transform : null);
+        var parent = GetContainer();
         if (!parent || !lineTemplate) return;
 
-        // voci dall'alto verso il basso
         if (!onlyBack && options != null)
         {
             foreach (var opt in options)
             {
                 if (opt.action == MenuOption.MenuAction.Label)
-                {
-                    CreateLine(parent, opt.title, selectable: false, isLabel: true);
-                }
+                    CreateLabelLine(parent, opt.title);
                 else
-                {
-                    int idx = selectableOptions.Count;
-                    selectableOptions.Add(opt);
-                    CreateLine(parent, opt.title, selectable: true, isLabel: false);
-                }
+                    CreateSelectableLine(parent, opt.title, opt);
             }
         }
 
-        // Back sempre in fondo
-        if (includeBack)
-            CreateLine(parent, backLabel, selectable: true, isLabel: false);
+        if (includeBack) CreateBackLine(parent);
     }
 
-    private void CreateLine(Transform parent, string text, bool selectable, bool isLabel)
+    private TMP_Text SpawnLine(Transform parent, string text)
     {
         var t = Instantiate(lineTemplate, parent);
         t.gameObject.SetActive(true);
-        t.enableVertexGradient = false;            // evita gradient/material grigi
-        t.color = isLabel ? labelColor : selectableNormalColor;
+
+        // Testo
+        t.enableAutoSizing = false;
+        t.enableWordWrapping = true;
+        t.overflowMode = TextOverflowModes.Overflow;
+        t.alignment = TextAlignmentOptions.TopLeft;
         t.text = text;
 
-        spawnedLines.Add(t);
+        // Stretched in orizzontale
+        var rt = t.rectTransform;
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(0f, 1f);
+        rt.sizeDelta = new Vector2(0f, 0f);
 
-        if (selectable)
-            activeLines.Add(t);
+        // ✅ IMPORTANTE: rimuovi qualsiasi LayoutElement del prefab (bloccherebbe l'altezza)
+        var le = t.GetComponent<LayoutElement>();
+        if (le) Destroy(le);
+
+        spawnedLines.Add(t);
+        return t;
+    }
+
+
+    private void CreateSelectableLine(Transform parent, string text, MenuOption opt)
+    {
+        var t = SpawnLine(parent, text);
+        t.color = selectableNormalColor;
+
+        activeLines.Add(t);
+        selectableOptions.Add(opt);
+    }
+
+    private void CreateLabelLine(Transform parent, string text)
+    {
+        var t = SpawnLine(parent, text);
+        t.color = labelColor; // non selezionabile
+    }
+
+    private void CreateBackLine(Transform parent)
+    {
+        var t = SpawnLine(parent, backLabel);
+        t.color = selectableNormalColor;
+        activeLines.Add(t); // selezionabile (ma NON in selectableOptions)
     }
 
     private void ClearList()
     {
-        // distruggi SOLO le righe generate (non il readingText)
-        for (int i = 0; i < spawnedLines.Count; i++)
-            if (spawnedLines[i]) Destroy(spawnedLines[i].gameObject);
-
-        spawnedLines.Clear();
+        Transform parent = GetContainer();
+        if (parent)
+        {
+            for (int i = parent.childCount - 1; i >= 0; i--)
+                Destroy(parent.GetChild(i).gameObject);
+        }
+        readingBodyLine = null;
         activeLines.Clear();
         selectableOptions.Clear();
         currentMenuIndex = 0;
@@ -316,7 +370,6 @@ public class BulletinController : MonoBehaviour
         {
             var t = activeLines[i];
             if (!t) continue;
-            t.enableVertexGradient = false;
             t.color = (i == currentMenuIndex) ? selectableHighlightColor : selectableNormalColor;
         }
     }
@@ -325,30 +378,34 @@ public class BulletinController : MonoBehaviour
     {
         if (state == MenuState.Reading)
         {
-            // torna al menu precedente o alla root, e rimetti a posto il reading
-            RestoreReadingParent();
             ShowMenu(menuHistory.Count > 0 ? menuHistory.Peek() : mainOptions);
             return;
         }
 
-        // state == General
-        if (menuHistory.Count == 0)
-        {
-            ExitInteraction(); // chiude e torna al player
-        }
-        else
-        {
-            var prev = menuHistory.Pop();
-            ShowMenu(prev);
-        }
+        if (menuHistory.Count == 0) ExitInteraction();
+        else ShowMenu(menuHistory.Pop());
     }
 
-    private void RestoreReadingParent()
+    private void UpdatePage() => UpdateReadingBodyTextAndHeight();
+
+    // --- helper ---
+    private void UpdateReadingBodyTextAndHeight()
     {
-        if (!readingText || !readingOrigParent) return;
-        readingText.transform.SetParent(readingOrigParent, false);
-        if (readingOrigSibling >= 0)
-            readingText.transform.SetSiblingIndex(readingOrigSibling);
-        readingText.gameObject.SetActive(false);
+        if (!readingBodyLine) return;
+
+        string txt = (currentPages != null && currentPages.Length > 0)
+            ? currentPages[currentPage]
+            : string.Empty;
+
+        readingBodyLine.text = txt;
+
+        // Aggiorna subito la mesh di TMP
+        readingBodyLine.ForceMeshUpdate();
+
+        // Rebuild immediato del layout
+        Canvas.ForceUpdateCanvases();
+        var root = (listPanel != null) ? listPanel.GetComponent<RectTransform>() : null;
+        if (root != null)
+            LayoutRebuilder.ForceRebuildLayoutImmediate(root);
     }
 }
