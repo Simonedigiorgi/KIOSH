@@ -1,359 +1,354 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
 using TMPro;
-using UnityEngine.UI;
-using System.Collections.Generic;
-using UnityEngine.Events; // ✅ necessario per UnityEvent
+using UnityEngine;
+using UnityEngine.Events;
 
 public class BulletinController : MonoBehaviour
 {
-    [Header("General Menu Config")]
+    [Header("Root Options (fornite da Adapter)")]
     public List<MenuOption> mainOptions;
 
+    // stato menu
     private List<MenuOption> currentOptions;
-    private List<MenuOption> rootOptions; // riferimento al main menu originale
-    private Stack<List<MenuOption>> menuHistory = new Stack<List<MenuOption>>();
-    private List<Button> activeButtons = new List<Button>();
+    private readonly Stack<List<MenuOption>> menuHistory = new Stack<List<MenuOption>>();
+
+    // righe UI generate (selezionabili + label + back)
+    private readonly List<TMP_Text> spawnedLines = new List<TMP_Text>();
+    private readonly List<TMP_Text> activeLines = new List<TMP_Text>();   // solo selezionabili + back
+    private readonly List<MenuOption> selectableOptions = new List<MenuOption>(); // 1:1 con voci selezionabili
+    private int currentMenuIndex = 0; // indice nell'elenco activeLines
+
+    // bridge verso l’interazione camera/player
     private BulletinInteraction activeInteraction;
 
-    [Header("Panels")]
-    public GameObject introPanel;
-    public GameObject commandPanel;
-    public GameObject generalMenuPanel;
-    public GameObject readingGroup;
-    public Button backMenuButton; // Assegna da inspector
+    [Header("UI")]
+    public GameObject listPanel;        // pannello con VerticalLayoutGroup
+    public Transform listContainer;     // se null, usa listPanel.transform
+    public TMP_Text lineTemplate;       // prefab di una riga (TMP_Text) disattivato nella scena
+    public TMP_Text readingText;        // testo del reading (deve avere LayoutElement con FlexibleHeight=1)
 
-    [Header("UI References")]
-    public Button menuButtonTemplate; // Prefab nascosto da clonare
-    public Transform generalMenuContainer; // Container per istanziare i bottoni
-    public TMP_Text bulletinText;
-    public Button leftButton;
-    public Button rightButton;
+    [Header("Colors")]
+    public Color labelColor = new(0.75f, 0.9f, 1f);
+    public Color selectableNormalColor = Color.white;
+    public Color selectableHighlightColor = Color.green;
 
-    private int currentPage = 0;
-    private int currentMenuIndex = 0;
+    [Header("Testi")]
+    public string backLabel = "Back";
+
+    [Header("Input")]
+    public KeyCode confirmKey = KeyCode.E;
+    public KeyCode upKey = KeyCode.W;
+    public KeyCode downKey = KeyCode.S;
+    public KeyCode prevPageKey = KeyCode.A;
+    public KeyCode nextPageKey = KeyCode.D;
+
+    // reading
     private string[] currentPages;
+    private int currentPage = 0;
 
-    private enum MenuState { None, Intro, General, Reading }
-    private MenuState currentState = MenuState.Intro;
+    // anti-doppio input (E del frame di apertura)
+    private int openedAtFrame = -1;
+
+    private enum MenuState { General, Reading }
+    private MenuState state = MenuState.General;
+
     private bool isInteracting = false;
-    private bool hasEntered = false;
+    public bool IsOpen => isInteracting;
+
+    // cache parent originale del readingText (se lo spostiamo nel listContainer)
+    private Transform readingOrigParent;
+    private int readingOrigSibling = -1;
 
     [System.Serializable]
     public class MenuOption
     {
         public string title;
-
-        // ✅ aggiunto "Invoke"
-        public enum MenuAction { OpenSubmenu, ShowReading, Invoke }
+        public enum MenuAction { OpenSubmenu, ShowReading, Invoke, Label }
         public MenuAction action;
-
-        [TextArea(3, 10)] public List<string> readingPages;   // usato se ShowReading
-        public List<MenuOption> subOptions;                   // usato se OpenSubmenu
-
-        // ✅ aggiunto: azione da eseguire quando la voce è di tipo Invoke
-        public UnityEvent onInvoke;
-    }
-
-    void Start()
-    {
-        ShowIntro();
-
-        if (backMenuButton != null)
-            backMenuButton.onClick.AddListener(OnBackMenuPressed);
+        [TextArea(3, 10)] public List<string> readingPages; // se ShowReading
+        public List<MenuOption> subOptions;                 // se OpenSubmenu
+        public UnityEvent onInvoke;                         // se Invoke
     }
 
     void Update()
     {
         if (!isInteracting) return;
 
-        switch (currentState)
+        // evita che l’E di apertura confermi subito qualcosa
+        if (Time.frameCount == openedAtFrame) return;
+
+        if (Input.GetKeyDown(downKey)) MoveSelection(1);
+        if (Input.GetKeyDown(upKey)) MoveSelection(-1);
+
+        if (Input.GetKeyDown(confirmKey))
         {
-            case MenuState.Intro:
-                if (Input.GetKeyDown(KeyCode.Return))
-                {
-                    hasEntered = true;
-                    ShowGeneralMenu();
-                }
-                break;
+            if (state == MenuState.General) ConfirmGeneral();
+            else ConfirmReading();
+        }
 
-            case MenuState.General:
-                HandleMenuNavigation();
-                if (Input.GetKeyDown(KeyCode.Return)) HandleGeneralMenuSelect();
-                break;
-
-            case MenuState.Reading:
-                if (Input.GetKeyDown(KeyCode.A)) PreviousPage();
-                if (Input.GetKeyDown(KeyCode.D)) NextPage();
-                if (Input.GetKeyDown(KeyCode.Return)) HandleReadingMenuSelect();
-                break;
+        if (state == MenuState.Reading)
+        {
+            if (Input.GetKeyDown(prevPageKey)) PreviousPage();
+            if (Input.GetKeyDown(nextPageKey)) NextPage();
         }
     }
 
+    // ===== API =====
     public void EnterInteraction(BulletinInteraction interaction)
     {
         activeInteraction = interaction;
         isInteracting = true;
-        hasEntered = false;
-        ShowIntro();
+        openedAtFrame = Time.frameCount;
+
+        menuHistory.Clear();
+        ShowMenu(mainOptions);
     }
 
     public void ExitInteraction()
     {
         isInteracting = false;
-        hasEntered = false;
-        HideAllPanels();
-        ShowIntro();
-    }
 
-    void ShowIntro()
-    {
-        currentState = MenuState.Intro;
-        HideAllPanels();
-        introPanel.SetActive(true);
-        commandPanel.SetActive(false);
-    }
+        ClearList();
+        // rimettiamo il readingText al suo posto e nascondiamo
+        RestoreReadingParent();
+        if (readingText) readingText.gameObject.SetActive(false);
 
-    void ShowGeneralMenu()
-    {
-        menuHistory.Clear();
-        rootOptions = mainOptions;
-        ShowDynamicMenu(mainOptions);
-    }
-
-    void ShowDynamicMenu(List<MenuOption> options)
-    {
-        currentState = MenuState.General;
-        HideAllPanels();
-        generalMenuPanel.SetActive(true);
-        commandPanel.SetActive(true);
-
-        currentOptions = options ?? new List<MenuOption>(); // ✅ safety
-        currentMenuIndex = 0;
-
-        // Pulisce vecchi bottoni
-        foreach (Transform child in generalMenuContainer)
-            Destroy(child.gameObject);
-
-        activeButtons.Clear();
-
-        for (int i = 0; i < currentOptions.Count; i++)
+        if (activeInteraction != null)
         {
-            int index = i;
-            MenuOption opt = currentOptions[i];
-            Button newBtn = Instantiate(menuButtonTemplate, generalMenuContainer);
-            newBtn.gameObject.SetActive(true);
-            newBtn.GetComponentInChildren<TMP_Text>().text = opt.title;
-
-            newBtn.onClick.AddListener(() =>
-            {
-                currentMenuIndex = index;
-                HandleGeneralMenuSelect();
-            });
-
-            activeButtons.Add(newBtn);
+            activeInteraction.ExitInteraction(); // restituisce camera/controlli
+            activeInteraction = null;
         }
+    }
 
-        // Aggiungi il tasto Back alla lista
-        if (backMenuButton != null)
+    public void SetRootOptions(List<MenuOption> options, bool refreshIfOpen = true)
+    {
+        mainOptions = options ?? new List<MenuOption>();
+        if (isInteracting && refreshIfOpen)
         {
-            activeButtons.Add(backMenuButton);
+            menuHistory.Clear();
+            ShowMenu(mainOptions);
         }
-
-        StartCoroutine(DelayedHighlight());
     }
 
-    System.Collections.IEnumerator DelayedHighlight()
+    // ===== MENU =====
+    private void ShowMenu(List<MenuOption> options)
     {
-        yield return null; // aspetta un frame
-        UpdateMenuHighlight();
+        state = MenuState.General;
+
+        if (listPanel) listPanel.SetActive(true);
+
+        // assicuriamoci che il readingText non resti nel container in modalità menu
+        RestoreReadingParent();
+        if (readingText) readingText.gameObject.SetActive(false);
+
+        currentOptions = options ?? new List<MenuOption>();
+        currentMenuIndex = 0; // sempre dalla prima voce
+        BuildList(currentOptions, includeBack: true, onlyBack: false);
+        UpdateHighlight();
     }
 
-    void HandleGeneralMenuSelect()
+    private void ConfirmGeneral()
     {
-        if (currentMenuIndex >= activeButtons.Count) return;
+        if (activeLines.Count == 0) return;
 
-        Button selectedBtn = activeButtons[currentMenuIndex];
-
-        if (selectedBtn == backMenuButton)
+        // l'ultima riga è Back
+        if (currentMenuIndex == activeLines.Count - 1)
         {
-            OnBackMenuPressed();
+            GoBack();
             return;
         }
 
-        if (currentOptions == null || currentMenuIndex >= currentOptions.Count) return;
+        int optIndex = currentMenuIndex; // mappa 1:1 con selectableOptions
+        if (optIndex < 0 || optIndex >= selectableOptions.Count) return;
 
-        var selected = currentOptions[currentMenuIndex];
+        var selected = selectableOptions[optIndex];
         switch (selected.action)
         {
             case MenuOption.MenuAction.OpenSubmenu:
                 menuHistory.Push(currentOptions);
-                ShowDynamicMenu(selected.subOptions);
+                ShowMenu(selected.subOptions);
                 break;
 
             case MenuOption.MenuAction.ShowReading:
-                ShowCustomReading(selected.readingPages);
+                ShowReading(selected.readingPages);
                 break;
 
-            case MenuOption.MenuAction.Invoke: // ✅ nuovo caso supportato
-                if (selected.onInvoke != null)
-                    selected.onInvoke.Invoke();
-                // dopo l’azione, ricarica il menu (aggiorna UI)
-                ShowGeneralMenu();
+            case MenuOption.MenuAction.Invoke:
+                selected.onInvoke?.Invoke();
+                // dopo l’azione torno alla root (aggiorno eventuali contatori)
+                menuHistory.Clear();
+                ShowMenu(mainOptions);
+                break;
+
+            case MenuOption.MenuAction.Label:
+                // non selezionabile
                 break;
         }
     }
 
-    void ShowCustomReading(List<string> pages)
+    // ===== READING =====
+    private void ShowReading(List<string> pages)
     {
-        // ✅ Salva il menu attuale nello stack per tornare indietro
-        menuHistory.Push(currentOptions);
+        state = MenuState.Reading;
 
         currentPages = (pages != null) ? pages.ToArray() : new string[0];
         currentPage = 0;
 
-        leftButton.gameObject.SetActive(currentPages.Length > 1);
-        rightButton.gameObject.SetActive(currentPages.Length > 1);
+        // porta il readingText dentro il listContainer come PRIMO elemento
+        Transform parent = listContainer ? listContainer : (listPanel ? listPanel.transform : null);
+        if (readingText && parent)
+        {
+            if (!readingOrigParent)    // cache una sola volta
+            {
+                readingOrigParent = readingText.transform.parent;
+                readingOrigSibling = readingText.transform.GetSiblingIndex();
+            }
+            readingText.transform.SetParent(parent, false);
+            readingText.transform.SetSiblingIndex(0); // in alto
+            readingText.gameObject.SetActive(true);
+        }
 
         UpdatePage();
-        ShowReading();
+
+        // in reading mostriamo solo Back (ed è in fondo perché aggiunto dopo il testo)
+        BuildList(null, includeBack: true, onlyBack: true);
+        currentMenuIndex = activeLines.Count - 1;
+        UpdateHighlight();
     }
 
-    void ShowReading()
-    {
-        currentState = MenuState.Reading;
-        HideAllPanels();
-        readingGroup.SetActive(true);
-        commandPanel.SetActive(true);
+    private void ConfirmReading() => GoBack();
 
-        // ⬇️ Aggiorna bottoni attivi per la lettura (solo il back)
-        activeButtons.Clear();
-        if (backMenuButton != null)
-        {
-            activeButtons.Add(backMenuButton);
-            currentMenuIndex = 0;
-            UpdateMenuHighlight();
-        }
+    private void UpdatePage()
+    {
+        if (!readingText) return;
+        readingText.text = (currentPages != null && currentPages.Length > 0)
+            ? currentPages[currentPage]
+            : string.Empty;
     }
 
-    void UpdatePage()
+    private void NextPage()
     {
-        if (currentPages != null && currentPages.Length > 0)
-            bulletinText.text = currentPages[currentPage];
-        else
-            bulletinText.text = string.Empty;
-    }
-
-    void NextPage()
-    {
-        if (currentPages != null && currentPage < currentPages.Length - 1)
+        if (currentPages == null) return;
+        if (currentPage < currentPages.Length - 1)
         {
             currentPage++;
             UpdatePage();
         }
     }
 
-    void PreviousPage()
+    private void PreviousPage()
     {
-        if (currentPages != null && currentPage > 0)
+        if (currentPages == null) return;
+        if (currentPage > 0)
         {
             currentPage--;
             UpdatePage();
         }
     }
 
-    void HideAllPanels()
+    // ===== COSTRUZIONE LISTA =====
+    private void BuildList(List<MenuOption> options, bool includeBack, bool onlyBack)
     {
-        introPanel.SetActive(false);
-        generalMenuPanel.SetActive(false);
-        readingGroup.SetActive(false);
-        commandPanel.SetActive(false);
-    }
+        ClearList();
 
-    void HandleMenuNavigation()
-    {
-        int count = activeButtons.Count;
-        if (count == 0) return;
+        Transform parent = listContainer ? listContainer : (listPanel ? listPanel.transform : null);
+        if (!parent || !lineTemplate) return;
 
-        if (Input.GetKeyDown(KeyCode.S))
+        // voci dall'alto verso il basso
+        if (!onlyBack && options != null)
         {
-            currentMenuIndex = (currentMenuIndex + 1) % count;
-            UpdateMenuHighlight();
-        }
-        else if (Input.GetKeyDown(KeyCode.W))
-        {
-            currentMenuIndex = (currentMenuIndex - 1 + count) % count;
-            UpdateMenuHighlight();
-        }
-    }
-
-    void UpdateMenuHighlight()
-    {
-        for (int i = 0; i < activeButtons.Count; i++)
-        {
-            var text = activeButtons[i].GetComponentInChildren<TMP_Text>();
-            if (text != null)
-                text.color = (i == currentMenuIndex) ? Color.green : Color.white;
-        }
-    }
-
-    public void ForceBackToIntro()
-    {
-        currentState = MenuState.Intro;
-        HideAllPanels();
-        introPanel.SetActive(true);
-        commandPanel.SetActive(false); // solo intro visibile
-    }
-
-    void OnBackMenuPressed()
-    {
-        switch (currentState)
-        {
-            case MenuState.General:
-                if (currentOptions == rootOptions)
+            foreach (var opt in options)
+            {
+                if (opt.action == MenuOption.MenuAction.Label)
                 {
-                    // Chiudi UI
-                    ExitInteraction();
-                    // Ripristina camera/player
-                    activeInteraction?.ExitInteraction();
-                    activeInteraction = null;
-                }
-                else if (menuHistory.Count > 0)
-                {
-                    var previousMenu = menuHistory.Pop();
-                    ShowDynamicMenu(previousMenu);
-                }
-                break;
-
-            case MenuState.Reading:
-                if (menuHistory.Count > 0)
-                {
-                    var previousMenu = menuHistory.Pop();
-                    ShowDynamicMenu(previousMenu);
+                    CreateLine(parent, opt.title, selectable: false, isLabel: true);
                 }
                 else
                 {
-                    ShowGeneralMenu();
+                    int idx = selectableOptions.Count;
+                    selectableOptions.Add(opt);
+                    CreateLine(parent, opt.title, selectable: true, isLabel: false);
                 }
-                break;
+            }
+        }
 
-            default:
-                ExitInteraction();
-                activeInteraction?.ExitInteraction();
-                activeInteraction = null;
-                break;
+        // Back sempre in fondo
+        if (includeBack)
+            CreateLine(parent, backLabel, selectable: true, isLabel: false);
+    }
+
+    private void CreateLine(Transform parent, string text, bool selectable, bool isLabel)
+    {
+        var t = Instantiate(lineTemplate, parent);
+        t.gameObject.SetActive(true);
+        t.enableVertexGradient = false;            // evita gradient/material grigi
+        t.color = isLabel ? labelColor : selectableNormalColor;
+        t.text = text;
+
+        spawnedLines.Add(t);
+
+        if (selectable)
+            activeLines.Add(t);
+    }
+
+    private void ClearList()
+    {
+        // distruggi SOLO le righe generate (non il readingText)
+        for (int i = 0; i < spawnedLines.Count; i++)
+            if (spawnedLines[i]) Destroy(spawnedLines[i].gameObject);
+
+        spawnedLines.Clear();
+        activeLines.Clear();
+        selectableOptions.Clear();
+        currentMenuIndex = 0;
+    }
+
+    private void MoveSelection(int dir)
+    {
+        if (activeLines.Count == 0) return;
+        currentMenuIndex = (currentMenuIndex + dir + activeLines.Count) % activeLines.Count;
+        UpdateHighlight();
+    }
+
+    private void UpdateHighlight()
+    {
+        for (int i = 0; i < activeLines.Count; i++)
+        {
+            var t = activeLines[i];
+            if (!t) continue;
+            t.enableVertexGradient = false;
+            t.color = (i == currentMenuIndex) ? selectableHighlightColor : selectableNormalColor;
         }
     }
 
-
-    void HandleReadingMenuSelect()
+    private void GoBack()
     {
-        if (currentMenuIndex >= activeButtons.Count) return;
-
-        Button selectedBtn = activeButtons[currentMenuIndex];
-
-        if (selectedBtn == backMenuButton)
+        if (state == MenuState.Reading)
         {
-            OnBackMenuPressed();
+            // torna al menu precedente o alla root, e rimetti a posto il reading
+            RestoreReadingParent();
+            ShowMenu(menuHistory.Count > 0 ? menuHistory.Peek() : mainOptions);
+            return;
         }
+
+        // state == General
+        if (menuHistory.Count == 0)
+        {
+            ExitInteraction(); // chiude e torna al player
+        }
+        else
+        {
+            var prev = menuHistory.Pop();
+            ShowMenu(prev);
+        }
+    }
+
+    private void RestoreReadingParent()
+    {
+        if (!readingText || !readingOrigParent) return;
+        readingText.transform.SetParent(readingOrigParent, false);
+        if (readingOrigSibling >= 0)
+            readingText.transform.SetSiblingIndex(readingOrigSibling);
+        readingText.gameObject.SetActive(false);
     }
 }

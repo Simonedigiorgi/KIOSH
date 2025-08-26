@@ -1,6 +1,5 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Events;
 
 public class DeliveryBulletinAdapter : MonoBehaviour
 {
@@ -12,16 +11,31 @@ public class DeliveryBulletinAdapter : MonoBehaviour
     [TextArea] public string msgDoorOpen = "Sportello aperto — chiudere per spedire.";
     [TextArea] public string msgInsertDish = "Inserire un piatto completo.";
 
+    [Header("Progress")]
+    public string progressFormat = "Piatti spediti: {0}/{1}";
+
     void Awake()
     {
-        if (bulletin == null) bulletin = GetComponent<BulletinController>();
+        if (!bulletin) bulletin = GetComponent<BulletinController>();
     }
 
     public void RefreshMenu()
     {
-        if (bulletin == null || deliveryBox == null) return;
+        if (!bulletin || !deliveryBox) return;
 
         var list = new List<BulletinController.MenuOption>();
+
+        // Etichetta progresso (NON selezionabile)
+        string progress = string.Format(
+            string.IsNullOrEmpty(progressFormat) ? "Piatti spediti: {0}/{1}" : progressFormat,
+            DeliveryBox.TotalDelivered,
+            deliveryBox.deliveryGoal
+        );
+        list.Add(new BulletinController.MenuOption
+        {
+            title = progress,
+            action = BulletinController.MenuOption.MenuAction.Label
+        });
 
         if (deliveryBox.IsDoorOpen)
         {
@@ -56,6 +70,7 @@ public class DeliveryBulletinAdapter : MonoBehaviour
             }
         }
 
-        bulletin.mainOptions = list; // ✅ solo questo
+        // Passa il root al controller. Se è già aperto, refresh immediato.
+        bulletin.SetRootOptions(list, refreshIfOpen: true);
     }
 }

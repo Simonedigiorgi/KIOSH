@@ -19,6 +19,9 @@ public class DeliveryBox : MonoBehaviour
     private bool isDoorAnimating = false;
     public bool IsDoorOpen => isDoorOpen;
 
+    public static int TotalDelivered = 0;   // 👈 contatore globale
+    public int deliveryGoal = 10;           // 👈 obiettivo (es. 10 piatti)
+
     [Header("UI (opzionale)")]
     [SerializeField] private DeliveryBulletinAdapter bulletinAdapter; // ← trascina l'adapter della board
 
@@ -114,7 +117,6 @@ public class DeliveryBox : MonoBehaviour
     // ========== SPEDIZIONE ==========
     public void OnDeliveryButtonClick()
     {
-        // non spedire se sportello aperto
         if (isDoorOpen) { Debug.Log("⛔ Sportello aperto: chiudere per spedire."); return; }
         if (currentDish == null || !currentDish.IsComplete) return;
 
@@ -122,7 +124,9 @@ public class DeliveryBox : MonoBehaviour
         Destroy(currentDish.gameObject);
         currentDish = null;
 
-        NotifyUI(); // ← aggiorna la board
+        TotalDelivered++; // 👈 incrementa contatore
+
+        NotifyUI(); // aggiorna la board
     }
 
     public bool IsOccupied => currentDish != null;

@@ -19,37 +19,32 @@ public class BulletinInteraction : MonoBehaviour
     public void EnterInteraction()
     {
         if (isInteracting) return;
-        if (playerCamera == null || cameraTargetPosition == null || playerController == null || bulletinController == null)
+        if (!playerCamera || !cameraTargetPosition || !playerController || !bulletinController)
         {
-            Debug.LogError("[BulletinInteraction] Riferimenti mancanti: assegna Camera/Target/PlayerController/BulletinController.");
+            Debug.LogError("[BulletinInteraction] Riferimenti mancanti.");
             return;
         }
 
-        // 1) disabilita davvero il controller PRIMA di toccare la camera
+        // disattiva controlli prima di muovere la camera
         playerController.SetControlsEnabled(false);
-        if (crosshairManager != null) crosshairManager.SetInteracting(true);
+        if (crosshairManager) crosshairManager.SetInteracting(true);
 
-        // 2) salva parent+posa locali
+        // backup
         originalCamParent = playerCamera.transform.parent;
         originalLocalPos = playerCamera.transform.localPosition;
         originalLocalRot = playerCamera.transform.localRotation;
 
-        // 3) re-parent al target e azzera local pose → combacia al millimetro
+        // reparent e azzera pose
         playerCamera.transform.SetParent(cameraTargetPosition, false);
         playerCamera.transform.localPosition = Vector3.zero;
         playerCamera.transform.localRotation = Quaternion.identity;
 
-        // 4) avvia UI (passiamo chi ha aperto, così la UI può richiudere correttamente)
+        // apri UI
         bulletinController.EnterInteraction(this);
 
-        // 1) costruisci il menù in base allo stato attuale del box
+        // popola/refresh menu (delivery adapter, se presente)
         var adapter = GetComponentInChildren<DeliveryBulletinAdapter>(true);
-        if (adapter != null) adapter.RefreshMenu();
-
-        // 2) poi apri la UI
-        bulletinController.EnterInteraction(this);
-
-        isInteracting = true;
+        if (adapter) adapter.RefreshMenu();
 
         isInteracting = true;
     }
@@ -58,14 +53,14 @@ public class BulletinInteraction : MonoBehaviour
     {
         if (!isInteracting) return;
 
-        // 1) ripristina parent+posa locale della camera
+        // ripristina camera
         playerCamera.transform.SetParent(originalCamParent, false);
         playerCamera.transform.localPosition = originalLocalPos;
         playerCamera.transform.localRotation = originalLocalRot;
 
-        // 2) riabilita il controller DOPO aver ripristinato la camera
+        // riattiva controlli
         playerController.SetControlsEnabled(true);
-        if (crosshairManager != null) crosshairManager.SetInteracting(false);
+        if (crosshairManager) crosshairManager.SetInteracting(false);
 
         isInteracting = false;
     }
