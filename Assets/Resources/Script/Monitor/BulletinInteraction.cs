@@ -3,48 +3,58 @@
 public class BulletinInteraction : MonoBehaviour
 {
     [Header("Refs")]
-    public Transform cameraTargetPosition; // pivot davanti al monitor
-    public Camera playerCamera;            // Main Camera
+    public Transform cameraTargetPosition;
+    public Camera playerCamera;
     public CrosshairManager crosshairManager;
     public BulletinController bulletinController;
     public PlayerController playerController;
 
-    // Backup camera (parent + posa locale)
+    // Backup camera
     private Transform originalCamParent;
     private Vector3 originalLocalPos;
     private Quaternion originalLocalRot;
 
     private bool isInteracting = false;
 
+    // 🔒 Anti-rientro immediato
+    [Header("Input Gate")]
+    [Tooltip("Tempo minimo dopo l’uscita prima di poter rientrare")]
+    public float reopenCooldown = 0.20f;   // 200 ms
+    private float reopenBlockUntil = 0f;
+
     public void EnterInteraction()
     {
+        // ⛔ blocca se siamo nel cooldown post-uscita
+        if (Time.time < reopenBlockUntil) return;
         if (isInteracting) return;
-        if (!playerCamera || !cameraTargetPosition || !playerController || !bulletinController)
+
+        if (playerCamera == null || cameraTargetPosition == null ||
+            playerController == null || bulletinController == null)
         {
             Debug.LogError("[BulletinInteraction] Riferimenti mancanti.");
             return;
         }
 
-        // disattiva controlli prima di muovere la camera
+        // Disabilita controlli prima di toccare la camera
         playerController.SetControlsEnabled(false);
-        if (crosshairManager) crosshairManager.SetInteracting(true);
+        if (crosshairManager != null) crosshairManager.SetInteracting(true);
 
-        // backup
+        // Salva parent+posa
         originalCamParent = playerCamera.transform.parent;
         originalLocalPos = playerCamera.transform.localPosition;
         originalLocalRot = playerCamera.transform.localRotation;
 
-        // reparent e azzera pose
+        // Reparent & snap
         playerCamera.transform.SetParent(cameraTargetPosition, false);
         playerCamera.transform.localPosition = Vector3.zero;
         playerCamera.transform.localRotation = Quaternion.identity;
 
-        // apri UI
+        // Apri UI
         bulletinController.EnterInteraction(this);
 
-        // popola/refresh menu (delivery adapter, se presente)
+        // Se vuoi, qui puoi fare refresh dell’adapter (non necessario per l’uscita)
         var adapter = GetComponentInChildren<DeliveryBulletinAdapter>(true);
-        if (adapter) adapter.RefreshMenu();
+        if (adapter != null) adapter.RefreshMenu();
 
         isInteracting = true;
     }
@@ -53,15 +63,18 @@ public class BulletinInteraction : MonoBehaviour
     {
         if (!isInteracting) return;
 
-        // ripristina camera
+        // Ripristina camera
         playerCamera.transform.SetParent(originalCamParent, false);
         playerCamera.transform.localPosition = originalLocalPos;
         playerCamera.transform.localRotation = originalLocalRot;
 
-        // riattiva controlli
+        // Riabilita controlli
         playerController.SetControlsEnabled(true);
-        if (crosshairManager) crosshairManager.SetInteracting(false);
+        if (crosshairManager != null) crosshairManager.SetInteracting(false);
 
         isInteracting = false;
+
+        // ⏱️ imposta il blocco per evitare la riapertura immediata
+        reopenBlockUntil = Time.time + reopenCooldown;
     }
 }
