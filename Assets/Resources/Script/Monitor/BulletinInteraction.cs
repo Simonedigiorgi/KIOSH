@@ -52,9 +52,9 @@ public class BulletinInteraction : MonoBehaviour
         // Apri UI
         bulletinController.EnterInteraction(this);
 
-        // Se vuoi, qui puoi fare refresh dell’adapter (non necessario per l’uscita)
-        var adapter = GetComponentInChildren<DeliveryBulletinAdapter>(true);
-        if (adapter != null) adapter.RefreshMenu();
+        // (opzionale) forza un refresh quando entri nell’interazione
+        // Non serve più chiamare l'adapter: adesso decide tutto il Controller
+        bulletinController.RefreshNow();
 
         isInteracting = true;
     }

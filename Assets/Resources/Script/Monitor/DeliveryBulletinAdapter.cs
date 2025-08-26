@@ -16,26 +16,39 @@ public class DeliveryBulletinAdapter : MonoBehaviour
 
     void Awake()
     {
+        // se non è sullo stesso GO, prova parent/children
         if (!bulletin) bulletin = GetComponent<BulletinController>();
+        if (!bulletin) bulletin = GetComponentInParent<BulletinController>();
+        if (!bulletin) bulletin = GetComponentInChildren<BulletinController>(true);
     }
 
-    public void RefreshMenu()
+    /// <summary>
+    /// Costruisce e RITORNA le opzioni per il controller.
+    /// Il controller chiamerà questo metodo quando deve refreshare.
+    /// </summary>
+    public List<BulletinController.MenuOption> BuildOptions()
     {
-        if (!bulletin || !deliveryBox) return;
-
         var list = new List<BulletinController.MenuOption>();
 
-        // Etichetta progresso (NON selezionabile)
+        if (!deliveryBox)
+        {
+            // placeholder utile per capire che la UI funziona
+            list.Add(new BulletinController.MenuOption { title = "Piatti spediti: 0/?", action = BulletinController.MenuOption.MenuAction.Label });
+            list.Add(new BulletinController.MenuOption
+            {
+                title = "Spedisci",
+                action = BulletinController.MenuOption.MenuAction.ShowReading,
+                readingPages = new List<string> { "Nessuna DeliveryBox collegata." }
+            });
+            return list;
+        }
+
         string progress = string.Format(
             string.IsNullOrEmpty(progressFormat) ? "Piatti spediti: {0}/{1}" : progressFormat,
             DeliveryBox.TotalDelivered,
             deliveryBox.deliveryGoal
         );
-        list.Add(new BulletinController.MenuOption
-        {
-            title = progress,
-            action = BulletinController.MenuOption.MenuAction.Label
-        });
+        list.Add(new BulletinController.MenuOption { title = progress, action = BulletinController.MenuOption.MenuAction.Label });
 
         if (deliveryBox.IsDoorOpen)
         {
@@ -52,7 +65,7 @@ public class DeliveryBulletinAdapter : MonoBehaviour
             {
                 var opt = new BulletinController.MenuOption
                 {
-                    title = "Spedisci",
+                    title = "Spedizione cibo / Automatica",
                     action = BulletinController.MenuOption.MenuAction.Invoke,
                     onInvoke = new UnityEngine.Events.UnityEvent()
                 };
@@ -63,14 +76,19 @@ public class DeliveryBulletinAdapter : MonoBehaviour
             {
                 list.Add(new BulletinController.MenuOption
                 {
-                    title = "Spedisci",
+                    title = "Spedizione cibo / Automatica",
                     action = BulletinController.MenuOption.MenuAction.ShowReading,
                     readingPages = new List<string> { msgInsertDish }
                 });
             }
         }
 
-        // Passa il root al controller. Se è già aperto, refresh immediato.
-        bulletin.SetRootOptions(list, refreshIfOpen: true);
+        return list;
+    }
+
+    // Chiamalo quando cambiano dati/stato (porta aperta, piatto inserito, consegna, ecc.)
+    public void NotifyChanged()
+    {
+        if (bulletin) bulletin.RefreshNow();
     }
 }

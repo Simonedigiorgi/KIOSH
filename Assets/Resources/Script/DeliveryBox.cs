@@ -7,11 +7,8 @@ public class DeliveryBox : MonoBehaviour
     public Transform platePosition;
     private Dish currentDish;
 
-    [Header("Bottone di spedizione")]
-    public GameObject deliveryButtonObject; // il cubo/mesh usato come tasto
-
     [Header("Sportello")]
-    public Transform door;             // <- assegna il Transform dello sportello
+    public Transform door;             // assegna il Transform dello sportello
     public float doorOpenZ = -80f;     // rotazione locale Z quando aperto
     public float doorClosedZ = 0f;     // rotazione locale Z quando chiuso
     public float doorAnimTime = 0.5f;  // durata apertura/chiusura
@@ -19,17 +16,22 @@ public class DeliveryBox : MonoBehaviour
     private bool isDoorAnimating = false;
     public bool IsDoorOpen => isDoorOpen;
 
-    public static int TotalDelivered = 0;   // 👈 contatore globale
-    public int deliveryGoal = 10;           // 👈 obiettivo (es. 10 piatti)
+    public static int TotalDelivered = 0;   // contatore globale
+    public int deliveryGoal = 10;           // obiettivo
 
     [Header("UI (opzionale)")]
-    [SerializeField] private DeliveryBulletinAdapter bulletinAdapter; // ← trascina l'adapter della board
+    [SerializeField] private BulletinController bulletinController;
+    [SerializeField] private DeliveryBulletinAdapter bulletinAdapter;       // se ancora usato
 
-    void Update()
+    void Awake()
     {
-        // Mostra il bottone SOLO se c’è un piatto e la porta è CHIUSA
-        if (deliveryButtonObject != null)
-            deliveryButtonObject.SetActive(currentDish != null && !isDoorOpen);
+        if (!bulletinController && bulletinAdapter)
+            bulletinController = bulletinAdapter.bulletin;
+
+        if (!bulletinController)
+            bulletinController = GetComponent<BulletinController>()
+                               ?? GetComponentInParent<BulletinController>()
+                               ?? GetComponentInChildren<BulletinController>(true);
     }
 
     // ========== SPORTELLO ==========
@@ -74,7 +76,7 @@ public class DeliveryBox : MonoBehaviour
         isDoorOpen = open;
         isDoorAnimating = false;
 
-        NotifyUI(); // ← aggiorna la board
+        NotifyUI();
     }
 
     private float NormalizeAngle(float z)
@@ -100,8 +102,11 @@ public class DeliveryBox : MonoBehaviour
             rb.isKinematic = true;
             rb.detectCollisions = true;
             rb.useGravity = false;
-            // usa velocity se linearVelocity non esiste nella tua versione
+#if UNITY_6000_OR_NEWER
             rb.linearVelocity = Vector3.zero;
+#else
+            rb.linearVelocity = Vector3.zero;
+#endif
             rb.angularVelocity = Vector3.zero;
         }
 
@@ -111,7 +116,7 @@ public class DeliveryBox : MonoBehaviour
         currentDish = dish;
         Debug.Log("📦 Piatto inserito nel delivery box.");
 
-        NotifyUI(); // ← aggiorna la board
+        NotifyUI();
     }
 
     // ========== SPEDIZIONE ==========
@@ -124,9 +129,9 @@ public class DeliveryBox : MonoBehaviour
         Destroy(currentDish.gameObject);
         currentDish = null;
 
-        TotalDelivered++; // 👈 incrementa contatore
+        TotalDelivered++;
 
-        NotifyUI(); // aggiorna la board
+        NotifyUI();
     }
 
     public bool IsOccupied => currentDish != null;
@@ -134,7 +139,20 @@ public class DeliveryBox : MonoBehaviour
     // ========== UI helper ==========
     private void NotifyUI()
     {
-        if (bulletinAdapter != null)
-            bulletinAdapter.RefreshMenu();
+        var controller = bulletinController;
+
+        if (!controller && bulletinAdapter)
+            controller = bulletinAdapter.bulletin
+                      ?? bulletinAdapter.GetComponent<BulletinController>()
+                      ?? bulletinAdapter.GetComponentInParent<BulletinController>()
+                      ?? bulletinAdapter.GetComponentInChildren<BulletinController>(true);
+
+        if (!controller)
+            controller = GetComponent<BulletinController>()
+                      ?? GetComponentInParent<BulletinController>()
+                      ?? GetComponentInChildren<BulletinController>(true);
+
+        if (controller)
+            controller.RefreshNow();
     }
 }
