@@ -9,12 +9,10 @@ public class ObjectReceiver : MonoBehaviour
     [Tooltip("Lista di posizioni possibili (Place_1, Place_2, ...)")]
     public List<Transform> placePoints = new List<Transform>();
 
-    // Stato dei punti → true se occupato
     private Dictionary<Transform, PickupObject> occupied = new Dictionary<Transform, PickupObject>();
 
     void Awake()
     {
-        // inizializza tutti come liberi
         foreach (var p in placePoints)
         {
             if (p != null && !occupied.ContainsKey(p))
@@ -54,19 +52,32 @@ public class ObjectReceiver : MonoBehaviour
             return;
         }
 
-        // piazza l’oggetto
+        // piazza l’oggetto in world space SENZA alterarne la scala
         item.transform.SetParent(null);
-        item.transform.SetPositionAndRotation(bestPoint.position, bestPoint.rotation);
+        item.transform.position = bestPoint.position;
+        item.transform.rotation = bestPoint.rotation;
+        // 🔑 la scala rimane quella del prefab originale
 
         item.isHeld = false;
         item.canBePickedUp = true;
-        item.currentPlacePoint = bestPoint; // 🔑 memorizza slot
+        item.currentPlacePoint = bestPoint;
 
         occupied[bestPoint] = item;
 
-        // Cookware
+        // Cookware → logica aggiuntiva
         var cookware = item.GetComponent<Cookware>();
-        if (cookware != null) cookware.OnPlacedInReceiver();
+        if (cookware != null)
+        {
+            cookware.OnPlacedInReceiver();
+
+            // se ha un cookTarget → aggancia lì
+            if (cookware.cookTarget != null)
+            {
+                item.transform.SetParent(cookware.cookTarget, true);
+                item.transform.localPosition = Vector3.zero;
+                item.transform.localRotation = Quaternion.identity;
+            }
+        }
 
         // Package
         var package = item.GetComponent<PackageBox>();
@@ -81,6 +92,7 @@ public class ObjectReceiver : MonoBehaviour
         }
     }
 
+
     public void Unplace(PickupObject item)
     {
         if (item == null) return;
@@ -90,11 +102,10 @@ public class ObjectReceiver : MonoBehaviour
 
         if (item.currentPlacePoint != null)
         {
-            occupied[item.currentPlacePoint] = null; // 🔓 libera lo slot
+            occupied[item.currentPlacePoint] = null;
             item.currentPlacePoint = null;
         }
 
-        // se è un piatto dentro a una DeliveryBox → deregistra
         var dish = item.GetComponent<Dish>();
         if (dish != null)
         {
@@ -102,5 +113,4 @@ public class ObjectReceiver : MonoBehaviour
             if (box != null) box.OnDishRemoved(dish);
         }
     }
-
 }

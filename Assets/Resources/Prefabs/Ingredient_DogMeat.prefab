@@ -125,7 +125,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   canBePickedUp: 1
   isHeld: 0
-  type: 3
+  type: 1
+  currentPlacePoint: {fileID: 0}
 --- !u!114 &7582073439847204655
 MonoBehaviour:
   m_ObjectHideFlags: 0
