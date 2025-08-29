@@ -6,12 +6,14 @@ public class BulletinInteraction : MonoBehaviour
     [Header("Refs")]
     public Transform cameraTargetPosition;
     public Camera playerCamera;
-    public CrosshairManager crosshairManager;
+    public HUDManager HudManager;
     public BulletinController bulletinController;
     public PlayerController playerController;
 
     [Header("Camera Transition")]
     public float transitionTime = 0.5f;
+    [Tooltip("Curva di interpolazione (0→1) per la transizione camera")]
+    public AnimationCurve transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
     // Backup camera
     private Transform originalCamParent;
@@ -36,23 +38,19 @@ public class BulletinInteraction : MonoBehaviour
             return;
         }
 
-        // disabilita controlli
         playerController.SetControlsEnabled(false);
-        if (crosshairManager) crosshairManager.SetInteracting(true);
+        if (HudManager) HudManager.SetInteracting(true);
 
-        // salva stato world-space
         originalCamParent = playerCamera.transform.parent;
         originalWorldPos = playerCamera.transform.position;
         originalWorldRot = playerCamera.transform.rotation;
 
-        // interrompi coroutine vecchia
         if (transitionCoroutine != null) StopCoroutine(transitionCoroutine);
         transitionCoroutine = StartCoroutine(TransitionCamera(
             targetPos: cameraTargetPosition.position,
             targetRot: cameraTargetPosition.rotation,
             onComplete: () =>
             {
-                // snap finale & reparent
                 playerCamera.transform.SetParent(cameraTargetPosition, false);
                 playerCamera.transform.localPosition = Vector3.zero;
                 playerCamera.transform.localRotation = Quaternion.identity;
@@ -68,10 +66,8 @@ public class BulletinInteraction : MonoBehaviour
     {
         if (!isInteracting) return;
 
-        // interrompi coroutine vecchia
         if (transitionCoroutine != null) StopCoroutine(transitionCoroutine);
 
-        // reparent provvisorio al parent originale
         playerCamera.transform.SetParent(originalCamParent, true);
 
         transitionCoroutine = StartCoroutine(TransitionCamera(
@@ -79,13 +75,12 @@ public class BulletinInteraction : MonoBehaviour
             targetRot: originalWorldRot,
             onComplete: () =>
             {
-                // snap finale
                 playerCamera.transform.SetParent(originalCamParent, false);
                 playerCamera.transform.position = originalWorldPos;
                 playerCamera.transform.rotation = originalWorldRot;
 
                 playerController.SetControlsEnabled(true);
-                if (crosshairManager) crosshairManager.SetInteracting(false);
+                if (HudManager) HudManager.SetInteracting(false);
 
                 isInteracting = false;
                 reopenBlockUntil = Time.time + reopenCooldown;
@@ -101,8 +96,10 @@ public class BulletinInteraction : MonoBehaviour
         while (t < 1f)
         {
             t += Time.deltaTime / transitionTime;
-            playerCamera.transform.position = Vector3.Lerp(startPos, targetPos, t);
-            playerCamera.transform.rotation = Quaternion.Slerp(startRot, targetRot, t);
+            float easedT = transitionCurve.Evaluate(t); // 👈 EaseInOut invece di lineare
+
+            playerCamera.transform.position = Vector3.Lerp(startPos, targetPos, easedT);
+            playerCamera.transform.rotation = Quaternion.Slerp(startRot, targetRot, easedT);
             yield return null;
         }
 

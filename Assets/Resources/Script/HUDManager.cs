@@ -2,7 +2,7 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 
-public class CrosshairManager : MonoBehaviour
+public class HUDManager : MonoBehaviour
 {
     [Header("UI References")]
     public Image crosshairImage;

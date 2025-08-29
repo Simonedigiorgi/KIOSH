@@ -31,14 +31,14 @@ public class ObjectReceiver : MonoBehaviour
     {
         if (item == null || placePoints.Count == 0) return;
 
-        // trova la posizione libera più vicina
+        // trova slot libero più vicino
         Transform bestPoint = null;
         float bestDist = Mathf.Infinity;
 
         foreach (var point in placePoints)
         {
             if (point == null) continue;
-            if (occupied.ContainsKey(point) && occupied[point] != null) continue; // già occupato
+            if (occupied.ContainsKey(point) && occupied[point] != null) continue;
 
             float d = Vector3.Distance(hitPoint, point.position);
             if (d < bestDist)
@@ -60,8 +60,8 @@ public class ObjectReceiver : MonoBehaviour
 
         item.isHeld = false;
         item.canBePickedUp = true;
+        item.currentPlacePoint = bestPoint; // 🔑 memorizza slot
 
-        // segna occupato
         occupied[bestPoint] = item;
 
         // Cookware
@@ -88,14 +88,10 @@ public class ObjectReceiver : MonoBehaviour
         item.canBePickedUp = true;
         item.isHeld = false;
 
-        // libera lo slot occupato
-        foreach (var kv in new Dictionary<Transform, PickupObject>(occupied))
+        if (item.currentPlacePoint != null)
         {
-            if (kv.Value == item)
-            {
-                occupied[kv.Key] = null;
-                break;
-            }
+            occupied[item.currentPlacePoint] = null; // 🔓 libera lo slot
+            item.currentPlacePoint = null;
         }
 
         // se è un piatto dentro a una DeliveryBox → deregistra
@@ -106,4 +102,5 @@ public class ObjectReceiver : MonoBehaviour
             if (box != null) box.OnDishRemoved(dish);
         }
     }
+
 }

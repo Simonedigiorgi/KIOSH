@@ -1,12 +1,20 @@
 ﻿using UnityEngine;
 
-public enum PickupType { Package, Pot, Pan, Ingredient, Dish }
+public enum PickupType
+{
+    Package,
+    Ingredient,
+    Dish
+}
 
 public class PickupObject : MonoBehaviour
 {
     public bool canBePickedUp = true;
     public bool isHeld = false;
-    public PickupType type = PickupType.Package; // default
+    public PickupType type = PickupType.Package;
+
+    // 🔑 slot corrente se piazzato
+    [HideInInspector] public Transform currentPlacePoint;
 
     public void PickUp(Transform hand)
     {
@@ -24,6 +32,14 @@ public class PickupObject : MonoBehaviour
         {
             box.OnDishRemoved(dish);
         }
+
+        // se era in un PlacePoint → liberiamo
+        if (currentPlacePoint != null)
+        {
+            var receiver = currentPlacePoint.GetComponentInParent<ObjectReceiver>();
+            if (receiver != null) receiver.Unplace(this);
+            currentPlacePoint = null; // reset
+        }
     }
 
     public void Drop()
@@ -32,9 +48,5 @@ public class PickupObject : MonoBehaviour
         transform.SetParent(null);
     }
 
-    // Hook per logica specializzata (Ingredient, Dish, ecc.)
-    public virtual bool InteractWith(GameObject target)
-    {
-        return false;
-    }
+    public virtual bool InteractWith(GameObject target) => false;
 }
