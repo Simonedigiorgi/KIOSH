@@ -131,7 +131,7 @@ GameObject:
   - component: {fileID: 18199906}
   - component: {fileID: 18199907}
   m_Layer: 3
-  m_Name: Pivot
+  m_Name: Plateposition
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -146,7 +146,7 @@ Transform:
   m_GameObject: {fileID: 18199904}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.1944, y: 0, z: 0}
+  m_LocalPosition: {x: -0.1944, y: -0.0107, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -171,35 +171,22 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.3, y: 0.2, z: 0.6}
+  m_Size: {x: 0.3, y: 0.01, z: 0.6}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!54 &18199907
-Rigidbody:
+--- !u!114 &18199907
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 18199904}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 776ad1ea37f3c2f43ac1e83e841e62ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  acceptedTypes: 04000000
+  placePivot: {fileID: 18199905}
 --- !u!1 &51570214
 GameObject:
   m_ObjectHideFlags: 0
@@ -8650,6 +8637,8 @@ MonoBehaviour:
   bulletin: {fileID: 752855815}
   msgDoorOpen: "Sportello aperto \u2014 chiudere per spedire."
   msgInsertDish: Inserire un piatto completo.
+  msgIncompleteDish: "Il piatto inserito non \xE8 completo: aggiungi gli ingredienti
+    mancanti."
   progressFormat: 'Piatto spediti: {0}/{1}'
 --- !u!82 &752855820
 AudioSource:
@@ -13263,7 +13252,6 @@ GameObject:
   - component: {fileID: 1055694221}
   - component: {fileID: 1055694220}
   - component: {fileID: 1055694219}
-  - component: {fileID: 1055694218}
   - component: {fileID: 1055694217}
   - component: {fileID: 1055694224}
   - component: {fileID: 1055694225}
@@ -13290,33 +13278,6 @@ MonoBehaviour:
   canBePickedUp: 0
   isHeld: 0
   type: 2
---- !u!54 &1055694218
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1055694216}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!64 &1055694219
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -18828,7 +18789,6 @@ GameObject:
   - component: {fileID: 1284398462}
   - component: {fileID: 1284398461}
   - component: {fileID: 1284398460}
-  - component: {fileID: 1284398458}
   - component: {fileID: 1284398457}
   - component: {fileID: 1284398456}
   - component: {fileID: 1284398465}
@@ -18868,33 +18828,6 @@ MonoBehaviour:
   canBePickedUp: 1
   isHeld: 0
   type: 0
---- !u!54 &1284398458
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1284398455}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!64 &1284398460
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -22334,7 +22267,6 @@ GameObject:
   - component: {fileID: 1438744171}
   - component: {fileID: 1438744170}
   - component: {fileID: 1438744169}
-  - component: {fileID: 1438744168}
   - component: {fileID: 1438744167}
   m_Layer: 0
   m_Name: DeliveryBox
@@ -22355,7 +22287,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 400a54d80eb99a44c92a23f2f1ec79cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  platePosition: {fileID: 18199905}
   door: {fileID: 1728317848}
   doorOpenZ: -80
   doorClosedZ: 0
@@ -22363,33 +22294,6 @@ MonoBehaviour:
   deliveryGoal: 10
   bulletinController: {fileID: 752855815}
   bulletinAdapter: {fileID: 752855819}
---- !u!54 &1438744168
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1438744166}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!64 &1438744169
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -25728,33 +25632,19 @@ MonoBehaviour:
   hotspotPriority: 0.5
   autoHotspotLayout: 0
   hotspotGroup: 0
---- !u!54 &1728317853
-Rigidbody:
+--- !u!114 &1728317853
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1728317847}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82a4a6541e27c174788f4aaccf25736c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  displayName: Sportello
 --- !u!43 &1744916738
 Mesh:
   m_ObjectHideFlags: 0
@@ -29523,7 +29413,6 @@ GameObject:
   - component: {fileID: 2030380368}
   - component: {fileID: 2030380367}
   - component: {fileID: 2030380366}
-  - component: {fileID: 2030380365}
   - component: {fileID: 2030380364}
   - component: {fileID: 2030380363}
   - component: {fileID: 2030380362}
@@ -29576,33 +29465,6 @@ MonoBehaviour:
   canBePickedUp: 1
   isHeld: 0
   type: 0
---- !u!54 &2030380365
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2030380361}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!64 &2030380366
 MeshCollider:
   m_ObjectHideFlags: 0
@@ -29959,7 +29821,6 @@ GameObject:
   - component: {fileID: 2032283969}
   - component: {fileID: 2032283968}
   - component: {fileID: 2032283967}
-  - component: {fileID: 2032283966}
   - component: {fileID: 2032283964}
   - component: {fileID: 2032283972}
   - component: {fileID: 2032283973}
@@ -29983,33 +29844,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   displayName: Pentola
---- !u!54 &2032283966
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2032283963}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!64 &2032283967
 MeshCollider:
   m_ObjectHideFlags: 0

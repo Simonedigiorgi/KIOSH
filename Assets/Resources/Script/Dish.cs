@@ -3,11 +3,12 @@ using UnityEngine;
 
 public class Dish : MonoBehaviour
 {
+    [Header("Dish Settings")]
     public Transform ingredientPivot;
     public int maxIngredients = 2;
 
     private int currentCount = 0;
-    private HashSet<string> addedIngredients = new HashSet<string>(); // ✅ tracciamento
+    private HashSet<string> addedIngredients = new HashSet<string>();
 
     public bool IsComplete => currentCount >= maxIngredients;
 
@@ -19,7 +20,6 @@ public class Dish : MonoBehaviour
             return false;
         }
 
-        // ❌ Evita duplicati dello stesso ID
         if (addedIngredients.Contains(ingredient.ingredientID))
         {
             Debug.LogWarning($"⚠️ L'ingrediente {ingredient.ingredientID} è già nel piatto!");
@@ -33,7 +33,7 @@ public class Dish : MonoBehaviour
             ingredientPivot
         );
 
-        addedIngredients.Add(ingredient.ingredientID); // ✅ registra
+        addedIngredients.Add(ingredient.ingredientID);
         currentCount++;
         return true;
     }

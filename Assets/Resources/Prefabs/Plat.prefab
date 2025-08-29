@@ -216,9 +216,8 @@ GameObject:
   - component: {fileID: 6740327902845393717}
   - component: {fileID: 248502017292601178}
   - component: {fileID: 3175576343979001368}
-  - component: {fileID: 3548222049549294349}
   - component: {fileID: 4351706679200722937}
-  - component: {fileID: 4872738361699224244}
+  - component: {fileID: 5722636963910190689}
   - component: {fileID: 147451148226082390}
   m_Layer: 3
   m_Name: Plat
@@ -236,7 +235,7 @@ Transform:
   m_GameObject: {fileID: 7568759176662529895}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0.76826453, z: -0, w: 0.6401324}
-  m_LocalPosition: {x: -6.226, y: 0.949, z: -0.164}
+  m_LocalPosition: {x: -6.2000003, y: 0.90000004, z: -0.2}
   m_LocalScale: {x: 0.47851, y: 0.47851, z: 0.47851}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -930,33 +929,6 @@ MeshCollider:
   m_Convex: 0
   m_CookingOptions: 30
   m_Mesh: {fileID: 5223358379873842518}
---- !u!54 &3548222049549294349
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7568759176662529895}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!114 &4351706679200722937
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -970,7 +942,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   displayName: Plat
---- !u!114 &4872738361699224244
+--- !u!114 &5722636963910190689
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -979,13 +951,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 7568759176662529895}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 90833e55f6e62ba49ab3c9e0f69d842a, type: 3}
+  m_Script: {fileID: 11500000, guid: 450b8f88641213346be09d43a9441b45, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   canBePickedUp: 1
   isHeld: 0
   type: 4
-  dish: {fileID: 147451148226082390}
 --- !u!114 &147451148226082390
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -998,6 +969,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5537fa78571b16b449b4c837d8c67162, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  canBePickedUp: 1
+  isHeld: 0
+  type: 4
   ingredientPivot: {fileID: 7320093189705889203}
   maxIngredients: 2
 --- !u!43 &3489473763428342992

@@ -28,6 +28,7 @@ public class PackageBox : MonoBehaviour
             return;
         }
 
+        // istanzia direttamente nella mano del player
         GameObject instance = Instantiate(
             ingredientPrefab,
             player.handPivot.position,
@@ -46,16 +47,7 @@ public class PackageBox : MonoBehaviour
         pickup.canBePickedUp = true;
         pickup.isHeld = true;
 
-        var rb = pickup.GetComponent<Rigidbody>();
-        if (rb)
-        {
-            rb.isKinematic = true;
-            rb.detectCollisions = false;
-        }
-
+        // 👉 assegna al player l’oggetto appena creato
         player.ReceiveExternalPickup(pickup);
     }
-
-
-
 }

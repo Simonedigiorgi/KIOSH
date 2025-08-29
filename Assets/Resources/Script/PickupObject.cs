@@ -2,31 +2,27 @@
 
 public enum PickupType { Package, Pot, Pan, Ingredient, Dish }
 
-[RequireComponent(typeof(Rigidbody))]
 public class PickupObject : MonoBehaviour
 {
     public bool canBePickedUp = true;
     public bool isHeld = false;
-    public PickupType type = PickupType.Package; // Default ora è Package
-
-    private Rigidbody rb;
-
-    void Awake()
-    {
-        rb = GetComponent<Rigidbody>();
-    }
+    public PickupType type = PickupType.Package; // default
 
     public void PickUp(Transform hand)
     {
+        if (!canBePickedUp) return;
+
         isHeld = true;
         transform.SetParent(hand);
         transform.localPosition = Vector3.zero;
         transform.localRotation = Quaternion.identity;
 
-        if (rb)
+        // se questo piatto era dentro una DeliveryBox → liberala
+        var box = GetComponentInParent<DeliveryBox>();
+        var dish = GetComponent<Dish>();
+        if (box != null && dish != null && box.CurrentDish == dish)
         {
-            rb.isKinematic = true;
-            rb.detectCollisions = false;
+            box.OnDishRemoved(dish);
         }
     }
 
@@ -34,17 +30,11 @@ public class PickupObject : MonoBehaviour
     {
         isHeld = false;
         transform.SetParent(null);
-
-        if (rb)
-        {
-            rb.isKinematic = false;
-            rb.detectCollisions = true;
-        }
     }
 
+    // Hook per logica specializzata (Ingredient, Dish, ecc.)
     public virtual bool InteractWith(GameObject target)
     {
         return false;
     }
-
 }

@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public class ObjectReceiver : MonoBehaviour
@@ -16,37 +16,27 @@ public class ObjectReceiver : MonoBehaviour
     {
         if (item == null) return;
 
-        item.transform.position = placePivot.position;
-        item.transform.rotation = placePivot.rotation;
+        // piazza l’oggetto
         item.transform.SetParent(null);
+        item.transform.SetPositionAndRotation(placePivot.position, placePivot.rotation);
 
         item.isHeld = false;
         item.canBePickedUp = true;
 
-        var rb = item.GetComponent<Rigidbody>();
-        if (rb)
-        {
-            rb.isKinematic = true;
-            rb.useGravity = false;
-            rb.detectCollisions = true;
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-        }
-
-        var interactor = FindObjectOfType<PlayerInteractor>();
-        if (interactor != null)
-            interactor.ClearHeld();
-
+        // Cookware
         var cookware = item.GetComponent<Cookware>();
-        if (cookware != null)
-        {
-            cookware.OnPlacedInReceiver();
-        }
+        if (cookware != null) cookware.OnPlacedInReceiver();
 
+        // Package
         var package = item.GetComponent<PackageBox>();
-        if (package != null)
+        if (package != null) package.Place();
+
+        // Dish in DeliveryBox
+        var dish = item.GetComponent<Dish>();
+        if (dish != null)
         {
-            package.Place(); // Bloccato dopo essere stato posizionato
+            var box = GetComponentInParent<DeliveryBox>();
+            if (box != null) box.RegisterDish(dish);
         }
     }
 
@@ -54,13 +44,16 @@ public class ObjectReceiver : MonoBehaviour
     {
         if (item == null) return;
 
-        var rb = item.GetComponent<Rigidbody>();
-        if (rb)
-        {
-            rb.isKinematic = false;
-            rb.useGravity = true;
-        }
-
+        // basta renderlo raccoglibile di nuovo
         item.canBePickedUp = true;
+        item.isHeld = false;
+
+        // se è un piatto dentro a una DeliveryBox → deregistra
+        var dish = item.GetComponent<Dish>();
+        if (dish != null)
+        {
+            var box = GetComponentInParent<DeliveryBox>();
+            if (box != null) box.OnDishRemoved(dish);
+        }
     }
 }
