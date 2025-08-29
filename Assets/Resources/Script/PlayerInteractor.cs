@@ -27,6 +27,7 @@ public class PlayerInteractor : MonoBehaviour
             DropHeld();
     }
 
+    // ---------- TARGET SELECTION ----------
     void UpdateRaycastTarget()
     {
         currentTarget = null;
@@ -40,57 +41,12 @@ public class PlayerInteractor : MonoBehaviour
         {
             GameObject hitObject = hit.collider.gameObject;
 
-            // ignora l’oggetto che ho in mano
+            // ignora oggetto tenuto in mano
             if (heldObject != null &&
                 (hitObject == heldObject || hitObject.transform.IsChildOf(heldObject.transform)))
                 continue;
 
-            // 1) PackageBox
-            var package = hitObject.GetComponentInParent<PackageBox>();
-            if (package != null)
-            {
-                currentTarget = package.gameObject;
-                currentTargetName = package.GetComponent<InteractableName>();
-                return;
-            }
-
-            // 2) PickupObject
-            var pickup = hitObject.GetComponentInParent<PickupObject>();
-            if (pickup != null)
-            {
-                currentTarget = pickup.gameObject;
-                currentTargetName = pickup.GetComponent<InteractableName>();
-                return;
-            }
-
-            // 3) BulletinInteraction (BOARD)
-            var board = hitObject.GetComponentInParent<BulletinInteraction>();
-            if (board != null)
-            {
-                currentTarget = board.gameObject;
-                currentTargetName = board.GetComponent<InteractableName>();
-                return;
-            }
-
-            // 4) ObjectReceiver (plate position o altri receiver)
-            var receiver = hitObject.GetComponentInParent<ObjectReceiver>();
-            if (receiver != null)
-            {
-                currentTarget = receiver.gameObject;
-                currentTargetName = receiver.GetComponent<InteractableName>();
-                return;
-            }
-
-            // 5) DeliveryBox (per lo sportello)
-            var box = hitObject.GetComponentInParent<DeliveryBox>();
-            if (box != null)
-            {
-                currentTarget = hitObject; // qui teniamo proprio lo sportello
-                currentTargetName = hitObject.GetComponent<InteractableName>();
-                return;
-            }
-
-            // fallback
+            // salva target
             currentTarget = hitObject;
             currentTargetName = hitObject.GetComponent<InteractableName>();
             return;
@@ -100,63 +56,48 @@ public class PlayerInteractor : MonoBehaviour
     // ---------- CORE ----------
     void HandleInteraction(bool isHolding)
     {
-        if (currentTarget == null)
+        if (!currentTarget)
         {
             Debug.Log("❌ Nessun target valido nel mirino.");
             return;
         }
 
-        // 0) BOARD
-        var bulletin = currentTarget.GetComponentInParent<BulletinInteraction>();
-        if (bulletin != null)
-        {
-            bulletin.EnterInteraction();
-            return;
-        }
-
-        // 1) Sportello DeliveryBox
-        if (TryToggleDeliveryDoor()) return;
-
-        // 2) Dispenser piatti
-        if (!isHolding && TryUseDishDispenser()) return;
-
-        // 3) PackageBox
-        if (!isHolding && TryUsePackageBox()) return;
-
-        // 4) Pickup specializzato
-        if (isHolding && heldPickup != null && heldPickup.InteractWith(currentTarget)) return;
-
-        // 5) piatto + cookware
-        if (isHolding && TryUseDishWithCookware()) return;
-
-        // 6) ingrediente + cookware
-        if (isHolding && TryCookWithHeldIngredient()) return;
-
-        // 7) ObjectReceiver (es. plate position)
-        if (isHolding && TryPlaceInObjectReceiver()) return;
-
-        // 8) fallback pickup
-        if (!isHolding && TryPickUpTarget()) return;
+        // ordine di priorità
+        if (TryBoard()) return;
+        if (TryDeliveryDoor()) return;
+        if (!isHolding && TryDishDispenser()) return;
+        if (!isHolding && TryPackageBox()) return;
+        if (isHolding && TryPickupSpecialized()) return;
+        if (isHolding && TryDishWithCookware()) return;
+        if (isHolding && TryCookIngredient()) return;
+        if (isHolding && TryObjectReceiver()) return;
+        if (!isHolding && TryPickup()) return;
 
         Debug.Log("⚠️ Nessuna azione disponibile per questo target.");
     }
 
-    // ---------- HELPER ----------
-    bool TryToggleDeliveryDoor()
+    // ---------- ACTIONS ----------
+    bool TryBoard()
     {
-        var box = currentTarget.GetComponentInParent<DeliveryBox>();
-        if (box != null)
+        var bulletin = currentTarget.GetComponentInParent<BulletinInteraction>();
+        if (bulletin)
         {
-            if (box.HandleDoorClick(currentTarget.transform))
-                return true;
+            bulletin.EnterInteraction();
+            return true;
         }
         return false;
     }
 
-    bool TryUseDishDispenser()
+    bool TryDeliveryDoor()
     {
-        var dispenser = currentTarget.GetComponent<DishDispenser>();
-        if (dispenser != null)
+        var box = currentTarget.GetComponentInParent<DeliveryBox>();
+        return box != null && box.HandleDoorClick(currentTarget.transform);
+    }
+
+    bool TryDishDispenser()
+    {
+        var dispenser = currentTarget.GetComponentInParent<DishDispenser>();
+        if (dispenser)
         {
             dispenser.TryGiveDishToPlayer(this);
             return true;
@@ -164,10 +105,10 @@ public class PlayerInteractor : MonoBehaviour
         return false;
     }
 
-    bool TryUsePackageBox()
+    bool TryPackageBox()
     {
-        var box = currentTarget.GetComponent<PackageBox>();
-        if (box != null && box.isPlaced)
+        var box = currentTarget.GetComponentInParent<PackageBox>();
+        if (box && box.isPlaced)
         {
             box.TryDeliver(this);
             return true;
@@ -175,26 +116,70 @@ public class PlayerInteractor : MonoBehaviour
         return false;
     }
 
-    bool TryPlaceInObjectReceiver()
+    bool TryPickupSpecialized()
+    {
+        return heldPickup != null && heldPickup.InteractWith(currentTarget);
+    }
+
+    bool TryDishWithCookware()
+    {
+        if (heldPickup?.type != PickupType.Dish) return false;
+        var dish = heldPickup.GetComponent<Dish>();
+        var cookware = currentTarget.GetComponentInParent<Cookware>();
+
+        if (dish && cookware && cookware.HasCookedIngredient())
+        {
+            var ingredient = cookware.GetCurrentIngredient();
+            if (ingredient && dish.TryAddCookedIngredient(ingredient))
+            {
+                cookware.ConsumeServing();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool TryCookIngredient()
+    {
+        if (heldPickup?.type != PickupType.Ingredient) return false;
+        var cookware = currentTarget.GetComponentInParent<Cookware>();
+        return cookware && cookware.TryAddIngredient(heldPickup);
+    }
+
+    bool TryObjectReceiver()
     {
         if (heldPickup == null) return false;
+
         var receiver = currentTarget.GetComponent<ObjectReceiver>();
         if (receiver != null && receiver.CanAccept(heldPickup))
         {
-            receiver.Place(heldPickup);
+            // usa l’ultimo punto del raycast per decidere il Place più vicino
+            Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
+            if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactableLayer))
+            {
+                receiver.Place(heldPickup, hit.point);
+            }
+            else
+            {
+                receiver.Place(heldPickup, receiver.transform.position); // fallback
+            }
+
             ClearHeld();
             return true;
         }
         return false;
     }
 
-    bool TryPickUpTarget()
+    bool TryPickup()
     {
-        var pickup = currentTarget.GetComponent<PickupObject>()
-                   ?? currentTarget.GetComponentInParent<PickupObject>();
-
-        if (pickup != null && pickup.canBePickedUp)
+        var pickup = currentTarget.GetComponentInParent<PickupObject>();
+        if (pickup && pickup.canBePickedUp)
         {
+            // 🔑 se l’oggetto era in un ObjectReceiver → liberiamo lo slot
+            var receiver = pickup.GetComponentInParent<ObjectReceiver>();
+            if (receiver != null)
+                receiver.Unplace(pickup);
+
             PickUp(pickup);
             return true;
         }
@@ -211,13 +196,13 @@ public class PlayerInteractor : MonoBehaviour
 
     void DropHeld()
     {
-        if (heldPickup != null) heldPickup.Drop();
+        if (heldPickup) heldPickup.Drop();
         ClearHeld();
     }
 
     public void ClearHeld()
     {
-        if (heldPickup != null) heldPickup.isHeld = false;
+        if (heldPickup) heldPickup.isHeld = false;
         heldObject = null;
         heldPickup = null;
     }
@@ -228,30 +213,5 @@ public class PlayerInteractor : MonoBehaviour
     {
         heldObject = pickup.gameObject;
         heldPickup = pickup;
-    }
-
-    bool TryCookWithHeldIngredient()
-    {
-        if (heldPickup == null || heldPickup.type != PickupType.Ingredient) return false;
-        var cookware = currentTarget.GetComponentInParent<Cookware>();
-        return cookware != null && cookware.TryAddIngredient(heldPickup);
-    }
-
-    bool TryUseDishWithCookware()
-    {
-        if (heldPickup == null || heldPickup.type != PickupType.Dish) return false;
-        var dish = heldPickup.GetComponent<Dish>();
-        var cookware = currentTarget.GetComponentInParent<Cookware>();
-
-        if (dish != null && cookware != null && cookware.HasCookedIngredient())
-        {
-            var ingredient = cookware.GetCurrentIngredient();
-            if (ingredient != null && dish.TryAddCookedIngredient(ingredient))
-            {
-                cookware.ConsumeServing();
-                return true;
-            }
-        }
-        return false;
     }
 }
