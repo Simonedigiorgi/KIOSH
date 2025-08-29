@@ -11485,7 +11485,7 @@ GameObject:
   - component: {fileID: 1010941328}
   - component: {fileID: 1010941327}
   m_Layer: 0
-  m_Name: UModeler Object (4)
+  m_Name: Tavolo
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
