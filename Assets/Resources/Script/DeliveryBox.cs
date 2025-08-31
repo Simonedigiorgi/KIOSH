@@ -25,9 +25,6 @@ public class DeliveryBox : MonoBehaviour
 
     void Awake()
     {
-        if (!bulletinController && bulletinAdapter)
-            bulletinController = bulletinAdapter.bulletin;
-
         if (!bulletinController)
             bulletinController = GetComponent<BulletinController>()
                                ?? GetComponentInParent<BulletinController>()
@@ -139,19 +136,13 @@ public class DeliveryBox : MonoBehaviour
     // ========== UI helper ==========
     private void NotifyUI()
     {
-        var controller = bulletinController;
+        if (!bulletinController)
+            bulletinController = GetComponent<BulletinController>()
+                               ?? GetComponentInParent<BulletinController>()
+                               ?? GetComponentInChildren<BulletinController>(true);
 
-        if (!controller && bulletinAdapter)
-            controller = bulletinAdapter.bulletin
-                      ?? bulletinAdapter.GetComponent<BulletinController>()
-                      ?? bulletinAdapter.GetComponentInParent<BulletinController>()
-                      ?? bulletinAdapter.GetComponentInChildren<BulletinController>(true);
-
-        if (!controller)
-            controller = GetComponent<BulletinController>()
-                      ?? GetComponentInParent<BulletinController>()
-                      ?? GetComponentInChildren<BulletinController>(true);
-
-        if (controller) controller.RefreshNow();
+        if (bulletinController)
+            bulletinController.RefreshNow();
     }
+
 }

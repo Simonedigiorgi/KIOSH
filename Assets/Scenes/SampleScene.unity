@@ -1999,35 +1999,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cameraTargetPosition: {fileID: 1689341557}
-  playerCamera: {fileID: 330585545}
-  HudManager: {fileID: 1116718199}
   bulletinController: {fileID: 752855815}
-  playerController: {fileID: 1016186865}
-  transitionTime: 0.5
-  transitionCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
+  cameraInteractor: {fileID: 1016186869}
   reopenCooldown: 0.2
 --- !u!65 &189525847
 BoxCollider:
@@ -8612,40 +8585,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a3518e17531fc1447a46a63a79c0ef2a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  canBeOpened: 1
   handle: {fileID: 1827442371}
   peephole: {fileID: 99804307}
   peepholeCameraTarget: {fileID: 3501347}
-  playerCamera: {fileID: 330585545}
-  playerController: {fileID: 1016186865}
+  cameraInteractor: {fileID: 1016186869}
   slideDistance: 1.2
   moveSpeed: 2
-  transitionTime: 0.5
-  transitionCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
   peepholeFOV: 35
-  fovTransitionTime: 0.5
 --- !u!1 &565869412
 GameObject:
   m_ObjectHideFlags: 0
@@ -10750,7 +10697,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c230c235073048c489ebcb8ef88baee3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mainOptions: []
+  mainOptions:
+  - title: Ciao
+    action: 0
+    readingPages: []
+    subOptions: []
+    onInvoke:
+      m_PersistentCalls:
+        m_Calls: []
   listPanel: {fileID: 1299146213}
   lineTemplate: {fileID: 4397572817798802823, guid: 301bccc7de550bc43a0c2caff16c85fb, type: 3}
   showBackWhenIdle: 1
@@ -14847,6 +14801,7 @@ GameObject:
   - component: {fileID: 1016186866}
   - component: {fileID: 1016186865}
   - component: {fileID: 1016186868}
+  - component: {fileID: 1016186869}
   m_Layer: 7
   m_Name: Player
   m_TagString: Untagged
@@ -14934,6 +14889,44 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   wrongIngredientMessage: {fileID: 11400000, guid: 2038eccc965be1a42a676574f00696f2, type: 2}
+--- !u!114 &1016186869
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1016186864}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a5f63e6ebeb8064c867e7da4ddc126a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerCamera: {fileID: 330585545}
+  defaultTransitionTime: 0.5
+  transitionCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &1016505094
 GameObject:
   m_ObjectHideFlags: 0
@@ -14948,6 +14941,7 @@ GameObject:
   - component: {fileID: 1016505097}
   - component: {fileID: 1016505096}
   - component: {fileID: 1016505100}
+  - component: {fileID: 1016505102}
   - component: {fileID: 1016505101}
   m_Layer: 5
   m_Name: BulletinCanvas
@@ -15213,6 +15207,19 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &1016505102
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1016505094}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66d6aa2ec1cea86408f8cb0a446fb94b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  roomDoor: {fileID: 539653676}
 --- !u!1 &1036416712
 GameObject:
   m_ObjectHideFlags: 0
@@ -15336,7 +15343,7 @@ GameObject:
   - component: {fileID: 1041914702}
   - component: {fileID: 1041914707}
   m_Layer: 3
-  m_Name: Board
+  m_Name: Room_Board
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -15355,35 +15362,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   cameraTargetPosition: {fileID: 212911690}
-  playerCamera: {fileID: 330585545}
-  HudManager: {fileID: 1116718199}
   bulletinController: {fileID: 1016505096}
-  playerController: {fileID: 1016186865}
-  transitionTime: 0.5
-  transitionCurve:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 0
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    - serializedVersion: 3
-      time: 1
-      value: 1
-      inSlope: 0
-      outSlope: 0
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0
-      outWeight: 0
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
+  cameraInteractor: {fileID: 1016186869}
   reopenCooldown: 0.2
 --- !u!65 &1041914703
 BoxCollider:
@@ -25664,7 +25644,7 @@ GameObject:
   - component: {fileID: 1438744169}
   - component: {fileID: 1438744167}
   m_Layer: 0
-  m_Name: DeliveryBox
+  m_Name: DeliveryBox_Board
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

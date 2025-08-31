@@ -8,33 +8,33 @@ public class DiagnosisBulletinAdapter : BulletinAdapterBase
 
     public override List<BulletinController.MenuOption> BuildOptions(List<BulletinController.MenuOption> baseOptions)
     {
-        var list = new List<BulletinController.MenuOption>();
+        var list = (baseOptions != null) ? new List<BulletinController.MenuOption>(baseOptions)
+                                         : new List<BulletinController.MenuOption>();
 
-        // 1. Manteniamo quello che già c’è
-        if (baseOptions != null)
-            list.AddRange(baseOptions);
+        // Evita doppione "Diagnosi" se già presente nelle statiche
+        bool hasDiagnosis = list.Exists(o => o != null && o.title == "Diagnosi");
 
-        // 2. Aggiungiamo Diagnosi (una sola volta)
-        var diagnosis = new BulletinController.MenuOption
+        if (!hasDiagnosis)
         {
-            title = "Diagnosi",
-            action = BulletinController.MenuOption.MenuAction.OpenSubmenu,
-            subOptions = new List<BulletinController.MenuOption>()
-        };
-
-        if (roomDoor != null)
-        {
-            string status = roomDoor.canBeOpened ? "Porta apribile" : "Porta bloccata";
-            diagnosis.subOptions.Add(new BulletinController.MenuOption
+            var diagnosis = new BulletinController.MenuOption
             {
-                title = status,
-                action = BulletinController.MenuOption.MenuAction.Label
-            });
-        }
+                title = "Diagnosi",
+                action = BulletinController.MenuOption.MenuAction.OpenSubmenu,
+                subOptions = new List<BulletinController.MenuOption>()
+            };
 
-        // appendiamo solo se non c’è già
-        if (!list.Exists(opt => opt.title == diagnosis.title))
+            if (roomDoor != null)
+            {
+                string status = roomDoor.canBeOpened ? "Porta apribile" : "Porta bloccata";
+                diagnosis.subOptions.Add(new BulletinController.MenuOption
+                {
+                    title = status,
+                    action = BulletinController.MenuOption.MenuAction.Label
+                });
+            }
+
             list.Add(diagnosis);
+        }
 
         return list;
     }

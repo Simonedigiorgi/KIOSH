@@ -7,8 +7,13 @@ using UnityEngine.UI;
 
 public class BulletinController : MonoBehaviour
 {
-    [Header("Root Options (fornite da Adapter)")]
-    public List<MenuOption> mainOptions;
+    [Header("Root Options (statiche da Inspector)")]
+    public List<MenuOption> mainOptions; // <-- SOLO base statiche
+
+    // Copia immutabile delle opzioni di base (snapshot preso in Awake)
+    private List<MenuOption> baseStaticOptions;
+    // Ultime opzioni “costruite” dagli adapter (solo per mostrare a schermo)
+    private List<MenuOption> lastBuiltOptions;
 
     // Stato / stack
     private List<MenuOption> currentOptions;
@@ -25,11 +30,11 @@ public class BulletinController : MonoBehaviour
     private BulletinInteraction activeInteraction;
 
     [Header("UI")]
-    public GameObject listPanel;        // ha VerticalLayoutGroup + ContentSizeFitter
-    public TMP_Text lineTemplate;       // prefab TMP_Text (DISATTIVATO in scena)
+    public GameObject listPanel;
+    public TMP_Text lineTemplate;
 
     [Header("UI Behavior")]
-    public bool showBackWhenIdle = true;   // mostra Back anche quando non si sta interagendo
+    public bool showBackWhenIdle = true;
 
     [Header("Colors")]
     public Color labelColor = new(0.75f, 0.9f, 1f);
@@ -79,12 +84,15 @@ public class BulletinController : MonoBehaviour
     {
         audioSource = GetComponent<AudioSource>();
         if (!audioSource) audioSource = gameObject.AddComponent<AudioSource>();
+        if (!listPanel) Debug.LogError("[BulletinController] Assegna ListPanel nel Inspector.");
 
-        if (!listPanel)
-            Debug.LogError("[BulletinController] Assegna ListPanel nel Inspector.");
+        // Prendiamo una snapshot delle opzioni statiche impostate da Inspector
+        baseStaticOptions = (mainOptions != null) ? new List<MenuOption>(mainOptions)
+                                                  : new List<MenuOption>();
+        // all’avvio mostriamo almeno le statiche
+        lastBuiltOptions = new List<MenuOption>(baseStaticOptions);
     }
 
-    // 👇 Auto-refresh: il controller popola da solo il pannello quando si attiva
     void OnEnable()
     {
         StartCoroutine(DeferredRefresh());
@@ -92,32 +100,31 @@ public class BulletinController : MonoBehaviour
 
     private IEnumerator DeferredRefresh()
     {
-        // aspetta 1 frame per essere sicuri che Canvas/Layout e altri Awake/OnEnable abbiano girato
         yield return null;
         RefreshNow();
     }
 
     /// <summary>
-    /// Ricostruisce le opzioni e mostra il menu.
-    /// - Se esiste un DeliveryBulletinAdapter vicino, usa quelle opzioni;
-    /// - altrimenti usa le mainOptions impostate da Inspector.
+    /// Ricostruisce le opzioni da mostrare partendo SEMPRE dalle statiche
+    /// e applicando tutti gli Adapter trovati nel pannello.
     /// </summary>
     public void RefreshNow()
     {
-        // main options definite a mano
-        var baseOptions = (mainOptions != null) ? new List<MenuOption>(mainOptions) : new List<MenuOption>();
+        // riparti sempre dalle opzioni statiche salvate in Awake
+        var options = new List<MenuOption>(baseStaticOptions);
 
-        // cerca tutti gli adapter collegati (non solo uno)
+        // applica tutti gli adapter presenti nel pannello
         var adapters = GetComponentsInChildren<BulletinAdapterBase>(true);
-
-        List<MenuOption> options = new List<MenuOption>(baseOptions);
-
         foreach (var adapter in adapters)
         {
-            options = adapter.BuildOptions(options);
+            options = adapter.BuildOptions(options) ?? options;
         }
 
-        SetRootOptions(options, refreshEvenIfClosed: true);
+        // memorizza l’ultima build (solo per UI)
+        lastBuiltOptions = options;
+
+        // mostra a schermo (senza toccare le opzioni statiche)
+        ShowMenu(lastBuiltOptions);
     }
 
     void Update()
@@ -150,30 +157,20 @@ public class BulletinController : MonoBehaviour
         openedAtFrame = Time.frameCount;
 
         menuHistory.Clear();
-        ShowMenu(mainOptions);
+        // mostra l’ultima build se esiste, altrimenti le statiche
+        ShowMenu(lastBuiltOptions ?? baseStaticOptions);
     }
 
     public void ExitInteraction()
     {
-        // Resta visibile in idle (niente Clear/Hide)
         isInteracting = false;
         state = MenuState.General;
 
-        ShowMenu(mainOptions);                  // ricostruisce con la policy del Back
+        ShowMenu(lastBuiltOptions ?? baseStaticOptions);
         openedAtFrame = Time.frameCount;
 
         activeInteraction?.ExitInteraction();
         activeInteraction = null;
-    }
-
-    public void SetRootOptions(List<MenuOption> options, bool refreshEvenIfClosed = false)
-    {
-        mainOptions = options ?? new List<MenuOption>();
-        if (isInteracting || refreshEvenIfClosed)
-        {
-            menuHistory.Clear();
-            ShowMenu(mainOptions);
-        }
     }
 
     // ===== MENU =====
@@ -215,7 +212,8 @@ public class BulletinController : MonoBehaviour
             case MenuOption.MenuAction.Invoke:
                 selected.onInvoke?.Invoke();
                 menuHistory.Clear();
-                ShowMenu(mainOptions);
+                // dopo un’azione, ricalcoliamo la build corrente
+                RefreshNow();
                 break;
 
             case MenuOption.MenuAction.Label:
@@ -233,12 +231,10 @@ public class BulletinController : MonoBehaviour
 
         if (listPanel) listPanel.SetActive(true);
 
-        // Costruisci: corpo + Back
         ClearList();
         Transform parent = listPanel ? listPanel.transform : null;
         if (!parent || !lineTemplate) return;
 
-        // 1) Corpo
         readingBodyLine = Instantiate(lineTemplate, parent);
         readingBodyLine.gameObject.SetActive(true);
         readingBodyLine.alignment = TextAlignmentOptions.TopLeft;
@@ -256,7 +252,6 @@ public class BulletinController : MonoBehaviour
 
         UpdateReadingBodyTextAndHeight();
 
-        // 2) Back sempre in fondo
         CreateBackLine(parent);
 
         currentMenuIndex = activeLines.Count - 1;
@@ -298,7 +293,6 @@ public class BulletinController : MonoBehaviour
         }
     }
 
-    // ===== COSTRUZIONE LISTA =====
     private void BuildList(List<MenuOption> options, bool includeBack, bool onlyBack)
     {
         ClearList();
@@ -310,6 +304,8 @@ public class BulletinController : MonoBehaviour
         {
             foreach (var opt in options)
             {
+                if (opt == null) continue;
+
                 if (opt.action == MenuOption.MenuAction.Label)
                     CreateLabelLine(parent, opt.title);
                 else
@@ -356,14 +352,14 @@ public class BulletinController : MonoBehaviour
     private void CreateLabelLine(Transform parent, string text)
     {
         var t = SpawnLine(parent, text);
-        t.color = labelColor; // non selezionabile
+        t.color = labelColor;
     }
 
     private void CreateBackLine(Transform parent)
     {
         var t = SpawnLine(parent, backLabel);
         t.color = selectableNormalColor;
-        activeLines.Add(t); // selezionabile (ma NON in selectableOptions)
+        activeLines.Add(t);
     }
 
     private void ClearList()
@@ -401,7 +397,7 @@ public class BulletinController : MonoBehaviour
     {
         if (state == MenuState.Reading)
         {
-            ShowMenu(menuHistory.Count > 0 ? menuHistory.Peek() : mainOptions);
+            ShowMenu(menuHistory.Count > 0 ? menuHistory.Peek() : (lastBuiltOptions ?? baseStaticOptions));
             return;
         }
 
@@ -411,13 +407,11 @@ public class BulletinController : MonoBehaviour
 
     private void UpdatePage() => UpdateReadingBodyTextAndHeight();
 
-    // --- helper ---
     private void UpdateReadingBodyTextAndHeight()
     {
         if (!readingBodyLine) return;
 
         string body = GetCurrentPageText();
-
         string prefix = (currentPages != null && currentPages.Length > 1)
             ? $"Pag. {currentPage + 1}/{currentPages.Length} - "
             : "";

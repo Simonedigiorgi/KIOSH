@@ -4,26 +4,21 @@ using UnityEngine;
 public class RoomDoor : MonoBehaviour
 {
     [Header("Debug / Stato")]
-    public bool canBeOpened = true; // 👈 controlla davvero se la porta può muoversi
+    public bool canBeOpened = true;
 
     [Header("Refs")]
     public Transform handle;
     public Transform peephole;
     public Transform peepholeCameraTarget;
-    public Camera playerCamera;
-    public PlayerController playerController;
+    public CameraInteractor cameraInteractor; // 👈 nuovo
 
     [Header("Movement")]
     public float slideDistance = 1.2f;
     public float moveSpeed = 2f;
-    public float transitionTime = 0.5f;
-    public AnimationCurve transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
     [Header("Camera FX")]
     public float peepholeFOV = 35f;
-    public float fovTransitionTime = 0.5f;
 
-    private float originalFOV;
     private Vector3 doorClosedPos;
     private Vector3 doorOpenPos;
     private Vector3 peepholeClosedPos;
@@ -31,12 +26,6 @@ public class RoomDoor : MonoBehaviour
 
     private bool isDoorOpen = false;
     private bool isLookingThroughPeephole = false;
-
-    // backup camera
-    private Transform originalCamParent;
-    private Vector3 originalCamPos;
-    private Quaternion originalCamRot;
-    private Coroutine transitionCoroutine;
 
     public bool IsLookingThroughPeephole => isLookingThroughPeephole;
 
@@ -52,7 +41,6 @@ public class RoomDoor : MonoBehaviour
     // ---------- HANDLE ----------
     public void InteractWithHandle()
     {
-        // 👇 Rispetta la condizione
         if (!canBeOpened)
         {
             Debug.Log("🚪 Porta bloccata, non può essere aperta.");
@@ -87,48 +75,28 @@ public class RoomDoor : MonoBehaviour
 
     private void EnterPeephole()
     {
-        if (!playerCamera || !peepholeCameraTarget || !playerController) return;
-
-        playerController.SetControlsEnabled(false);
+        if (!peepholeCameraTarget || !cameraInteractor) return;
 
         StopAllCoroutines();
         StartCoroutine(SlidePeephole(true));
 
-        originalCamParent = playerCamera.transform.parent;
-        originalCamPos = playerCamera.transform.position;
-        originalCamRot = playerCamera.transform.rotation;
-        originalFOV = playerCamera.fieldOfView;
-
-        if (transitionCoroutine != null) StopCoroutine(transitionCoroutine);
-        transitionCoroutine = StartCoroutine(TransitionCamera(
-            peepholeCameraTarget.position,
-            peepholeCameraTarget.rotation,
-            () => isLookingThroughPeephole = true
-        ));
-
-        StartCoroutine(TransitionFOV(originalFOV, peepholeFOV));
+        cameraInteractor.EnterInteraction(
+            peepholeCameraTarget,
+            fov: peepholeFOV,
+            onComplete: () => isLookingThroughPeephole = true
+        );
     }
 
     private void ExitPeephole()
     {
-        if (!playerCamera || !playerController) return;
+        if (!cameraInteractor) return;
 
         StopAllCoroutines();
         StartCoroutine(SlidePeephole(false));
 
-        if (transitionCoroutine != null) StopCoroutine(transitionCoroutine);
-        transitionCoroutine = StartCoroutine(TransitionCamera(
-            originalCamPos,
-            originalCamRot,
-            () =>
-            {
-                playerCamera.transform.SetParent(originalCamParent, false);
-                playerController.SetControlsEnabled(true);
-                isLookingThroughPeephole = false;
-            }
-        ));
-
-        StartCoroutine(TransitionFOV(playerCamera.fieldOfView, originalFOV));
+        cameraInteractor.ExitInteraction(
+            onComplete: () => isLookingThroughPeephole = false
+        );
     }
 
     private IEnumerator SlidePeephole(bool open)
@@ -143,38 +111,5 @@ public class RoomDoor : MonoBehaviour
             peephole.localPosition = Vector3.Lerp(start, target, t);
             yield return null;
         }
-    }
-
-    private IEnumerator TransitionCamera(Vector3 targetPos, Quaternion targetRot, System.Action onComplete)
-    {
-        Vector3 startPos = playerCamera.transform.position;
-        Quaternion startRot = playerCamera.transform.rotation;
-
-        float t = 0;
-        while (t < 1f)
-        {
-            t += Time.deltaTime / transitionTime;
-            float easedT = transitionCurve.Evaluate(t);
-
-            playerCamera.transform.position = Vector3.Lerp(startPos, targetPos, easedT);
-            playerCamera.transform.rotation = Quaternion.Slerp(startRot, targetRot, easedT);
-
-            yield return null;
-        }
-
-        onComplete?.Invoke();
-    }
-
-    private IEnumerator TransitionFOV(float start, float target)
-    {
-        float t = 0f;
-        while (t < 1f)
-        {
-            t += Time.deltaTime / fovTransitionTime;
-            float easedT = transitionCurve.Evaluate(t);
-            playerCamera.fieldOfView = Mathf.Lerp(start, target, easedT);
-            yield return null;
-        }
-        playerCamera.fieldOfView = target;
     }
 }

@@ -5,7 +5,6 @@ public class DeliveryBulletinAdapter : BulletinAdapterBase
 {
     [Header("Refs")]
     public DeliveryBox deliveryBox;
-    public BulletinController bulletin;
 
     [Header("Testi")]
     [TextArea] public string msgDoorOpen = "Sportello aperto — chiudere per spedire.";
@@ -15,22 +14,11 @@ public class DeliveryBulletinAdapter : BulletinAdapterBase
     [Header("Progress")]
     public string progressFormat = "Piatti spediti: {0}/{1}";
 
-    void Awake()
-    {
-        if (!bulletin) bulletin = GetComponent<BulletinController>();
-        if (!bulletin) bulletin = GetComponentInParent<BulletinController>();
-        if (!bulletin) bulletin = GetComponentInChildren<BulletinController>(true);
-    }
-
     public override List<BulletinController.MenuOption> BuildOptions(List<BulletinController.MenuOption> baseOptions)
     {
-        var list = new List<BulletinController.MenuOption>();
+        var list = (baseOptions != null) ? new List<BulletinController.MenuOption>(baseOptions)
+                                         : new List<BulletinController.MenuOption>();
 
-        // 1. manteniamo quello che già c’è
-        if (baseOptions != null)
-            list.AddRange(baseOptions);
-
-        // 2. aggiungiamo le opzioni della delivery
         if (!deliveryBox)
         {
             list.Add(new BulletinController.MenuOption
@@ -47,19 +35,15 @@ public class DeliveryBulletinAdapter : BulletinAdapterBase
             return list;
         }
 
-        // progresso
-        string progress = string.Format(
-            string.IsNullOrEmpty(progressFormat) ? "Piatti spediti: {0}/{1}" : progressFormat,
-            DeliveryBox.TotalDelivered,
-            deliveryBox.deliveryGoal
-        );
+        // Progresso
+        string progress = string.Format(string.IsNullOrEmpty(progressFormat) ? "Piatti spediti: {0}/{1}" : progressFormat,
+                                        DeliveryBox.TotalDelivered, deliveryBox.deliveryGoal);
         list.Add(new BulletinController.MenuOption
         {
             title = progress,
             action = BulletinController.MenuOption.MenuAction.Label
         });
 
-        // stato porta + contenuto
         if (deliveryBox.IsDoorOpen)
         {
             list.Add(new BulletinController.MenuOption
@@ -106,10 +90,5 @@ public class DeliveryBulletinAdapter : BulletinAdapterBase
         }
 
         return list;
-    }
-
-    public void NotifyChanged()
-    {
-        if (bulletin) bulletin.RefreshNow();
     }
 }
