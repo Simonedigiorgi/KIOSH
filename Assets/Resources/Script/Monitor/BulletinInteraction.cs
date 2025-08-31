@@ -40,7 +40,7 @@ public class BulletinInteraction : MonoBehaviour
 
         playerController.SetControlsEnabled(false);
 
-        originalCamParent = playerCamera.transform.parent;
+        // 👇 salviamo world pos/rot, ma NON cambiamo parent
         originalWorldPos = playerCamera.transform.position;
         originalWorldRot = playerCamera.transform.rotation;
 
@@ -50,13 +50,9 @@ public class BulletinInteraction : MonoBehaviour
             targetRot: cameraTargetPosition.rotation,
             onComplete: () =>
             {
-                playerCamera.transform.SetParent(cameraTargetPosition, false);
-                playerCamera.transform.localPosition = Vector3.zero;
-                playerCamera.transform.localRotation = Quaternion.identity;
-
+                // ❌ rimosso SetParent
                 bulletinController.EnterInteraction(this);
                 bulletinController.RefreshNow();
-
                 isInteracting = true;
             }));
     }
@@ -67,23 +63,18 @@ public class BulletinInteraction : MonoBehaviour
 
         if (transitionCoroutine != null) StopCoroutine(transitionCoroutine);
 
-        playerCamera.transform.SetParent(originalCamParent, true);
-
+        // ❌ rimosso SetParent
         transitionCoroutine = StartCoroutine(TransitionCamera(
             targetPos: originalWorldPos,
             targetRot: originalWorldRot,
             onComplete: () =>
             {
-                playerCamera.transform.SetParent(originalCamParent, false);
-                playerCamera.transform.position = originalWorldPos;
-                playerCamera.transform.rotation = originalWorldRot;
-
                 playerController.SetControlsEnabled(true);
-
                 isInteracting = false;
                 reopenBlockUntil = Time.time + reopenCooldown;
             }));
     }
+
 
     private IEnumerator TransitionCamera(Vector3 targetPos, Quaternion targetRot, System.Action onComplete)
     {

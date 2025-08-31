@@ -13,7 +13,6 @@ public class PickupObject : MonoBehaviour
     public bool isHeld = false;
     public PickupType type = PickupType.Package;
 
-    // 🔑 slot corrente se piazzato
     [HideInInspector] public Transform currentPlacePoint;
 
     public void PickUp(Transform hand)
@@ -22,15 +21,10 @@ public class PickupObject : MonoBehaviour
 
         isHeld = true;
 
-        // 🔑 salva scala globale prima del parenting
-        Vector3 originalScale = transform.lossyScale;
-
-        transform.SetParent(hand, true); // "true" mantiene worldPosition/Rotation/Scale
+        // Parenting mantenendo world transform → NON tocca lo scale
+        transform.SetParent(hand, true);
         transform.localPosition = Vector3.zero;
         transform.localRotation = Quaternion.identity;
-
-        // 🔑 ripristina scala globale originale
-        transform.localScale = originalScale;
 
         // se questo piatto era dentro una DeliveryBox → liberala
         var box = GetComponentInParent<DeliveryBox>();
@@ -45,15 +39,14 @@ public class PickupObject : MonoBehaviour
         {
             var receiver = currentPlacePoint.GetComponentInParent<ObjectReceiver>();
             if (receiver != null) receiver.Unplace(this);
-            currentPlacePoint = null; // reset
+            currentPlacePoint = null;
         }
     }
-
 
     public void Drop()
     {
         isHeld = false;
-        transform.SetParent(null);
+        transform.SetParent(null, true); // mantiene scala e rotazione
     }
 
     public virtual bool InteractWith(GameObject target) => false;

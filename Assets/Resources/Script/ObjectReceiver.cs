@@ -5,8 +5,6 @@ public class ObjectReceiver : MonoBehaviour
 {
     [Header("Settings")]
     public List<PickupType> acceptedTypes;
-
-    [Tooltip("Lista di posizioni possibili (Place_1, Place_2, ...)")]
     public List<Transform> placePoints = new List<Transform>();
 
     private Dictionary<Transform, PickupObject> occupied = new Dictionary<Transform, PickupObject>();
@@ -52,11 +50,10 @@ public class ObjectReceiver : MonoBehaviour
             return;
         }
 
-        // 🔑 piazza SENZA cambiare scala e SENZA diventare child
-        item.transform.SetParent(null);
+        // 🔑 piazza mantenendo scala globale
+        item.transform.SetParent(null, true); // true = mantieni world position/rotation/scale
         item.transform.position = bestPoint.position;
         item.transform.rotation = bestPoint.rotation;
-        // 👇 non tocchiamo mai localScale → resta com’era
 
         item.isHeld = false;
         item.canBePickedUp = true;
@@ -80,7 +77,6 @@ public class ObjectReceiver : MonoBehaviour
             if (box != null) box.RegisterDish(dish);
         }
     }
-
 
     public void Unplace(PickupObject item)
     {

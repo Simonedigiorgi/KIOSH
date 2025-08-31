@@ -41,28 +41,48 @@ public class PlayerInteractor : MonoBehaviour
         currentTargetName = null;
 
         Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
-        RaycastHit[] hits = Physics.RaycastAll(ray, interactDistance, interactableLayer);
+        RaycastHit[] hits = Physics.RaycastAll(ray, interactDistance, ~0);
+        // 👆 ~0 = tutti i layer, così possiamo intercettare anche Default
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
         foreach (var hit in hits)
         {
             GameObject hitObject = hit.collider.gameObject;
 
+            // Se colpiamo il Default → blocca il raycast qui
+            if (hitObject.layer == LayerMask.NameToLayer("Default"))
+            {
+                return; // muro o altro → interrompi
+            }
+
             // ignora oggetto tenuto in mano
             if (heldObject != null &&
                 (hitObject == heldObject || hitObject.transform.IsChildOf(heldObject.transform)))
                 continue;
 
-            // salva target
+            // considera solo layer dentro interactableLayer
+            if ((interactableLayer.value & (1 << hitObject.layer)) == 0)
+                continue;
+
+            // salva target valido
             currentTarget = hitObject;
             currentTargetName = hitObject.GetComponent<InteractableName>();
             return;
         }
     }
 
+
     // ---------- CORE ----------
     void HandleInteraction(bool isHolding)
     {
+        // 👇 Se sei nello spioncino → ESCI direttamente
+        var door = FindObjectOfType<RoomDoor>();
+        if (door != null && door.IsLookingThroughPeephole)
+        {
+            door.InteractWithPeephole(); // richiama Exit
+            return;
+        }
+
         if (!currentTarget)
         {
             Debug.Log("❌ Nessun target valido nel mirino.");
@@ -72,6 +92,7 @@ public class PlayerInteractor : MonoBehaviour
         // ordine di priorità
         if (TryBoard()) return;
         if (TryDeliveryDoor()) return;
+        if (TryRoomDoor()) return;
         if (!isHolding && TryDishDispenser()) return;
         if (!isHolding && TryPackageBox()) return;
         if (isHolding && TryPickupSpecialized()) return;
@@ -82,6 +103,29 @@ public class PlayerInteractor : MonoBehaviour
 
         Debug.Log("⚠️ Nessuna azione disponibile per questo target.");
     }
+
+    // ---------- DOOR ----------
+    bool TryRoomDoor()
+    {
+        var door = currentTarget.GetComponentInParent<RoomDoor>();
+        if (door == null) return false;
+
+        // ✅ confronto diretto con i riferimenti della porta
+        if (door.peephole != null && currentTarget.transform == door.peephole)
+        {
+            door.InteractWithPeephole();
+            return true;
+        }
+
+        if (door.handle != null && currentTarget.transform == door.handle)
+        {
+            door.InteractWithHandle();
+            return true;
+        }
+
+        return false;
+    }
+
 
     // ---------- ACTIONS ----------
     bool TryBoard()
