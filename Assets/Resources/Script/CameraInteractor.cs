@@ -5,15 +5,13 @@ using UnityEngine;
 [RequireComponent(typeof(PlayerController))]
 public class CameraInteractor : MonoBehaviour
 {
-    [Header("Refs")]
-    public Camera playerCamera;
+    [Header("Transition Settings")]
+    [SerializeField] private float defaultTransitionTime = 0.5f;
+    [SerializeField] private AnimationCurve transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
+
+    private Camera playerCamera;
     private PlayerController playerController;
 
-    [Header("Transition Settings")]
-    public float defaultTransitionTime = 0.5f;
-    public AnimationCurve transitionCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
-
-    // Backup dati
     private Vector3 originalPos;
     private Quaternion originalRot;
     private float originalFOV;
@@ -24,20 +22,14 @@ public class CameraInteractor : MonoBehaviour
     void Awake()
     {
         playerController = GetComponent<PlayerController>();
-        if (!playerCamera) playerCamera = Camera.main;
+        playerCamera = Camera.main;
     }
 
-    // ========= API PUBBLICA =========
-
-    /// <summary>
-    /// Entra in un’interazione disabilitando i controlli e muovendo la camera
-    /// </summary>
     public void EnterInteraction(Transform target, float transitionTime = -1f, Action onComplete = null, float? fov = null)
     {
         if (!playerCamera || !playerController) return;
 
         playerController.SetControlsEnabled(false);
-
         SaveOriginal();
 
         if (transitionCoroutine != null) StopCoroutine(transitionCoroutine);
@@ -69,9 +61,6 @@ public class CameraInteractor : MonoBehaviour
         ));
     }
 
-
-    // ========= PRIVATE =========
-
     private void SaveOriginal()
     {
         originalParent = playerCamera.transform.parent;
@@ -80,36 +69,26 @@ public class CameraInteractor : MonoBehaviour
         originalFOV = playerCamera.fieldOfView;
     }
 
-private IEnumerator TransitionTo(
-    Vector3 targetPos,
-    Quaternion targetRot,
-    float duration,
-    Action onComplete,
-    float? targetFOV = null
-)
-{
-    Vector3 startPos = playerCamera.transform.position;
-    Quaternion startRot = playerCamera.transform.rotation;
-    float startFOV = playerCamera.fieldOfView;
-    float endFOV = targetFOV ?? startFOV;
-
-    float t = 0f;
-    while (t < 1f)
+    private IEnumerator TransitionTo(Vector3 targetPos, Quaternion targetRot, float duration, Action onComplete, float? targetFOV = null)
     {
-        t += Time.deltaTime / duration;
-        float easedT = transitionCurve.Evaluate(t);
+        Vector3 startPos = playerCamera.transform.position;
+        Quaternion startRot = playerCamera.transform.rotation;
+        float startFOV = playerCamera.fieldOfView;
+        float endFOV = targetFOV ?? startFOV;
 
-        // posizione e rotazione
-        playerCamera.transform.position = Vector3.Lerp(startPos, targetPos, easedT);
-        playerCamera.transform.rotation = Quaternion.Slerp(startRot, targetRot, easedT);
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / duration;
+            float easedT = transitionCurve.Evaluate(t);
 
-        // fov
-        playerCamera.fieldOfView = Mathf.Lerp(startFOV, endFOV, easedT);
+            playerCamera.transform.position = Vector3.Lerp(startPos, targetPos, easedT);
+            playerCamera.transform.rotation = Quaternion.Slerp(startRot, targetRot, easedT);
+            playerCamera.fieldOfView = Mathf.Lerp(startFOV, endFOV, easedT);
 
-        yield return null;
+            yield return null;
+        }
+
+        onComplete?.Invoke();
     }
-
-    onComplete?.Invoke();
-}
-
 }

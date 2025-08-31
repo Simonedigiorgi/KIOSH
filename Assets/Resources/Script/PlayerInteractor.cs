@@ -3,24 +3,26 @@
 public class PlayerInteractor : MonoBehaviour
 {
     [Header("Refs")]
-    public Camera playerCamera;
     public Transform handPivot;
 
     [Header("Interaction")]
-    public float interactDistance = 3f;
-    public LayerMask interactableLayer;
+    [SerializeField] private float interactDistance = 3f;
+    [SerializeField] private LayerMask interactableLayer;
 
+    private Camera playerCamera;
     private GameObject heldObject;
     private PickupObject heldPickup;
-
-    public HUDMessageSet wrongIngredientMessage;
 
     public GameObject currentTarget { get; private set; }
     public InteractableName currentTargetName { get; private set; }
 
+    private void Awake()
+    {
+        playerCamera = Camera.main;
+    }
+
     void Update()
     {
-        // Blocca input gameplay mentre il dialogo è aperto
         if (HUDManager.Instance != null && HUDManager.Instance.IsDialogOpen)
             return;
 
@@ -33,7 +35,6 @@ public class PlayerInteractor : MonoBehaviour
             DropHeld();
     }
 
-
     // ---------- TARGET SELECTION ----------
     void UpdateRaycastTarget()
     {
@@ -42,44 +43,35 @@ public class PlayerInteractor : MonoBehaviour
 
         Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
         RaycastHit[] hits = Physics.RaycastAll(ray, interactDistance, ~0);
-        // 👆 ~0 = tutti i layer, così possiamo intercettare anche Default
         System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
         foreach (var hit in hits)
         {
             GameObject hitObject = hit.collider.gameObject;
 
-            // Se colpiamo il Default → blocca il raycast qui
             if (hitObject.layer == LayerMask.NameToLayer("Default"))
-            {
-                return; // muro o altro → interrompi
-            }
+                return; // muro o blocco → interrompi
 
-            // ignora oggetto tenuto in mano
             if (heldObject != null &&
                 (hitObject == heldObject || hitObject.transform.IsChildOf(heldObject.transform)))
                 continue;
 
-            // considera solo layer dentro interactableLayer
             if ((interactableLayer.value & (1 << hitObject.layer)) == 0)
                 continue;
 
-            // salva target valido
             currentTarget = hitObject;
             currentTargetName = hitObject.GetComponent<InteractableName>();
             return;
         }
     }
 
-
     // ---------- CORE ----------
     void HandleInteraction(bool isHolding)
     {
-        // 👇 Se sei nello spioncino → ESCI direttamente
         var door = FindObjectOfType<RoomDoor>();
         if (door != null && door.IsLookingThroughPeephole)
         {
-            door.InteractWithPeephole(); // richiama Exit
+            door.InteractWithPeephole();
             return;
         }
 
@@ -89,7 +81,6 @@ public class PlayerInteractor : MonoBehaviour
             return;
         }
 
-        // ordine di priorità
         if (TryBoard()) return;
         if (TryDeliveryDoor()) return;
         if (TryRoomDoor()) return;
@@ -110,7 +101,6 @@ public class PlayerInteractor : MonoBehaviour
         var door = currentTarget.GetComponentInParent<RoomDoor>();
         if (door == null) return false;
 
-        // ✅ confronto diretto con i riferimenti della porta
         if (door.peephole != null && currentTarget.transform == door.peephole)
         {
             door.InteractWithPeephole();
@@ -125,7 +115,6 @@ public class PlayerInteractor : MonoBehaviour
 
         return false;
     }
-
 
     // ---------- ACTIONS ----------
     bool TryBoard()
@@ -202,11 +191,10 @@ public class PlayerInteractor : MonoBehaviour
         else
         {
             Debug.Log("⚠️ Ingrediente incompatibile con questo strumento.");
-            HUDManager.Instance?.ShowDialog(wrongIngredientMessage);
+            HUDManager.Instance?.ShowDialog("Non puoi usare questo ingrediente");
             return true;
         }
     }
-
 
     bool TryObjectReceiver()
     {
@@ -215,16 +203,11 @@ public class PlayerInteractor : MonoBehaviour
         var receiver = currentTarget.GetComponent<ObjectReceiver>();
         if (receiver != null && receiver.CanAccept(heldPickup))
         {
-            // usa l’ultimo punto del raycast per decidere il Place più vicino
             Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
             if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactableLayer))
-            {
                 receiver.Place(heldPickup, hit.point);
-            }
             else
-            {
-                receiver.Place(heldPickup, receiver.transform.position); // fallback
-            }
+                receiver.Place(heldPickup, receiver.transform.position);
 
             ClearHeld();
             return true;
@@ -237,7 +220,6 @@ public class PlayerInteractor : MonoBehaviour
         var pickup = currentTarget.GetComponentInParent<PickupObject>();
         if (pickup && pickup.canBePickedUp)
         {
-            // 🔑 se l’oggetto era in un ObjectReceiver → liberiamo lo slot
             var receiver = pickup.GetComponentInParent<ObjectReceiver>();
             if (receiver != null)
                 receiver.Unplace(pickup);
