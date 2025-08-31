@@ -13,11 +13,17 @@ public class PlayerInteractor : MonoBehaviour
     private GameObject heldObject;
     private PickupObject heldPickup;
 
+    public HUDMessageSet wrongIngredientMessage;
+
     public GameObject currentTarget { get; private set; }
     public InteractableName currentTargetName { get; private set; }
 
     void Update()
     {
+        // Blocca input gameplay mentre il dialogo è aperto
+        if (HUDManager.Instance != null && HUDManager.Instance.IsDialogOpen)
+            return;
+
         UpdateRaycastTarget();
 
         if (Input.GetKeyDown(KeyCode.E))
@@ -26,6 +32,7 @@ public class PlayerInteractor : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Q))
             DropHeld();
     }
+
 
     // ---------- TARGET SELECTION ----------
     void UpdateRaycastTarget()
@@ -143,8 +150,19 @@ public class PlayerInteractor : MonoBehaviour
     {
         if (heldPickup?.type != PickupType.Ingredient) return false;
         var cookware = currentTarget.GetComponentInParent<Cookware>();
-        return cookware && cookware.TryAddIngredient(heldPickup);
+
+        if (cookware && cookware.TryAddIngredient(heldPickup))
+        {
+            return true;
+        }
+        else
+        {
+            Debug.Log("⚠️ Ingrediente incompatibile con questo strumento.");
+            HUDManager.Instance?.ShowDialog(wrongIngredientMessage);
+            return true;
+        }
     }
+
 
     bool TryObjectReceiver()
     {

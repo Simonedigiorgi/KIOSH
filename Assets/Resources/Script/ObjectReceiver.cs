@@ -52,11 +52,11 @@ public class ObjectReceiver : MonoBehaviour
             return;
         }
 
-        // piazza l’oggetto in world space SENZA alterarne la scala
+        // 🔑 piazza SENZA cambiare scala e SENZA diventare child
         item.transform.SetParent(null);
         item.transform.position = bestPoint.position;
         item.transform.rotation = bestPoint.rotation;
-        // 🔑 la scala rimane quella del prefab originale
+        // 👇 non tocchiamo mai localScale → resta com’era
 
         item.isHeld = false;
         item.canBePickedUp = true;
@@ -64,20 +64,9 @@ public class ObjectReceiver : MonoBehaviour
 
         occupied[bestPoint] = item;
 
-        // Cookware → logica aggiuntiva
+        // Cookware
         var cookware = item.GetComponent<Cookware>();
-        if (cookware != null)
-        {
-            cookware.OnPlacedInReceiver();
-
-            // se ha un cookTarget → aggancia lì
-            if (cookware.cookTarget != null)
-            {
-                item.transform.SetParent(cookware.cookTarget, true);
-                item.transform.localPosition = Vector3.zero;
-                item.transform.localRotation = Quaternion.identity;
-            }
-        }
+        if (cookware != null) cookware.OnPlacedInReceiver();
 
         // Package
         var package = item.GetComponent<PackageBox>();

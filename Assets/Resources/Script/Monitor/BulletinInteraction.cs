@@ -39,7 +39,6 @@ public class BulletinInteraction : MonoBehaviour
         }
 
         playerController.SetControlsEnabled(false);
-        if (HudManager) HudManager.SetInteracting(true);
 
         originalCamParent = playerCamera.transform.parent;
         originalWorldPos = playerCamera.transform.position;
@@ -80,7 +79,6 @@ public class BulletinInteraction : MonoBehaviour
                 playerCamera.transform.rotation = originalWorldRot;
 
                 playerController.SetControlsEnabled(true);
-                if (HudManager) HudManager.SetInteracting(false);
 
                 isInteracting = false;
                 reopenBlockUntil = Time.time + reopenCooldown;

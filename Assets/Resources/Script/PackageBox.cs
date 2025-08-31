@@ -25,6 +25,7 @@ public class PackageBox : MonoBehaviour
         if (IngredientManager.Instance.IsIngredientActive(ing.ingredientID))
         {
             Debug.Log($"⛔ Ingrediente '{ing.ingredientID}' già attivo.");
+            HUDManager.Instance?.ShowDialog("Stai già cucinando questo ingrediente");
             return;
         }
 

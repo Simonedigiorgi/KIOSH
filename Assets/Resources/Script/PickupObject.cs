@@ -21,9 +21,16 @@ public class PickupObject : MonoBehaviour
         if (!canBePickedUp) return;
 
         isHeld = true;
-        transform.SetParent(hand);
+
+        // 🔑 salva scala globale prima del parenting
+        Vector3 originalScale = transform.lossyScale;
+
+        transform.SetParent(hand, true); // "true" mantiene worldPosition/Rotation/Scale
         transform.localPosition = Vector3.zero;
         transform.localRotation = Quaternion.identity;
+
+        // 🔑 ripristina scala globale originale
+        transform.localScale = originalScale;
 
         // se questo piatto era dentro una DeliveryBox → liberala
         var box = GetComponentInParent<DeliveryBox>();
@@ -41,6 +48,7 @@ public class PickupObject : MonoBehaviour
             currentPlacePoint = null; // reset
         }
     }
+
 
     public void Drop()
     {

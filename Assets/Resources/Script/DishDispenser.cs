@@ -19,6 +19,7 @@ public class DishDispenser : MonoBehaviour
         if (activeDishes.Count >= maxDishesInScene)
         {
             Debug.Log("📛 Troppi piatti in scena.");
+            HUDManager.Instance.ShowDialog("Il dispencer non ha altri piatti disponibili");
             return;
         }
 
