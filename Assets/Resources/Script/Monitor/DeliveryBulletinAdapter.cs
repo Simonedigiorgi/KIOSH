@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
-public class DeliveryBulletinAdapter : MonoBehaviour
+public class DeliveryBulletinAdapter : BulletinAdapterBase
 {
     [Header("Refs")]
     public DeliveryBox deliveryBox;
@@ -22,10 +22,15 @@ public class DeliveryBulletinAdapter : MonoBehaviour
         if (!bulletin) bulletin = GetComponentInChildren<BulletinController>(true);
     }
 
-    public List<BulletinController.MenuOption> BuildOptions()
+    public override List<BulletinController.MenuOption> BuildOptions(List<BulletinController.MenuOption> baseOptions)
     {
         var list = new List<BulletinController.MenuOption>();
 
+        // 1. manteniamo quello che già c’è
+        if (baseOptions != null)
+            list.AddRange(baseOptions);
+
+        // 2. aggiungiamo le opzioni della delivery
         if (!deliveryBox)
         {
             list.Add(new BulletinController.MenuOption
@@ -42,7 +47,7 @@ public class DeliveryBulletinAdapter : MonoBehaviour
             return list;
         }
 
-        // Etichetta progresso
+        // progresso
         string progress = string.Format(
             string.IsNullOrEmpty(progressFormat) ? "Piatti spediti: {0}/{1}" : progressFormat,
             DeliveryBox.TotalDelivered,
@@ -54,7 +59,7 @@ public class DeliveryBulletinAdapter : MonoBehaviour
             action = BulletinController.MenuOption.MenuAction.Label
         });
 
-        // Porta aperta
+        // stato porta + contenuto
         if (deliveryBox.IsDoorOpen)
         {
             list.Add(new BulletinController.MenuOption
@@ -66,12 +71,10 @@ public class DeliveryBulletinAdapter : MonoBehaviour
         }
         else
         {
-            // C’è un piatto dentro
             if (deliveryBox.IsOccupied)
             {
                 if (deliveryBox.CurrentDish != null && !deliveryBox.CurrentDish.IsComplete)
                 {
-                    // Piatto non completo → messaggio, non comando
                     list.Add(new BulletinController.MenuOption
                     {
                         title = "Spedizione cibo / Automatica",
@@ -81,7 +84,6 @@ public class DeliveryBulletinAdapter : MonoBehaviour
                 }
                 else
                 {
-                    // Piatto completo → pulsante reale
                     var opt = new BulletinController.MenuOption
                     {
                         title = "Spedizione cibo / Automatica",
@@ -94,7 +96,6 @@ public class DeliveryBulletinAdapter : MonoBehaviour
             }
             else
             {
-                // Nessun piatto inserito
                 list.Add(new BulletinController.MenuOption
                 {
                     title = "Spedizione cibo / Automatica",

@@ -104,25 +104,19 @@ public class BulletinController : MonoBehaviour
     /// </summary>
     public void RefreshNow()
     {
-        List<MenuOption> options = null;
+        // main options definite a mano
+        var baseOptions = (mainOptions != null) ? new List<MenuOption>(mainOptions) : new List<MenuOption>();
 
-        // Cerca un adapter sullo stesso GO, nel parent o nei figli (anche disattivati)
-        var adapter = GetComponent<DeliveryBulletinAdapter>()
-                   ?? GetComponentInParent<DeliveryBulletinAdapter>()
-                   ?? GetComponentInChildren<DeliveryBulletinAdapter>(true);
+        // cerca tutti gli adapter collegati (non solo uno)
+        var adapters = GetComponentsInChildren<BulletinAdapterBase>(true);
 
-        if (adapter != null)
+        List<MenuOption> options = new List<MenuOption>(baseOptions);
+
+        foreach (var adapter in adapters)
         {
-            // L'adapter fornisce *soltanto* i dati; il controller decide quando mostrare
-            options = adapter.BuildOptions();
-        }
-        else
-        {
-            // Nessun adapter: usa le opzioni definite nel controller
-            options = (mainOptions != null) ? new List<MenuOption>(mainOptions) : new List<MenuOption>();
+            options = adapter.BuildOptions(options);
         }
 
-        // Forza la visualizzazione anche se non stiamo interagendo
         SetRootOptions(options, refreshEvenIfClosed: true);
     }
 

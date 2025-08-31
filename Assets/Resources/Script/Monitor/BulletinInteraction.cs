@@ -52,7 +52,6 @@ public class BulletinInteraction : MonoBehaviour
             {
                 // ❌ rimosso SetParent
                 bulletinController.EnterInteraction(this);
-                bulletinController.RefreshNow();
                 isInteracting = true;
             }));
     }

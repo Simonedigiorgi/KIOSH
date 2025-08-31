@@ -3,8 +3,11 @@ using UnityEngine;
 
 public class RoomDoor : MonoBehaviour
 {
+    [Header("Debug / Stato")]
+    public bool canBeOpened = true; // 👈 controlla davvero se la porta può muoversi
+
     [Header("Refs")]
-    public Transform handle;    // non più handlePivot
+    public Transform handle;
     public Transform peephole;
     public Transform peepholeCameraTarget;
     public Camera playerCamera;
@@ -21,7 +24,6 @@ public class RoomDoor : MonoBehaviour
     public float fovTransitionTime = 0.5f;
 
     private float originalFOV;
-
     private Vector3 doorClosedPos;
     private Vector3 doorOpenPos;
     private Vector3 peepholeClosedPos;
@@ -50,6 +52,13 @@ public class RoomDoor : MonoBehaviour
     // ---------- HANDLE ----------
     public void InteractWithHandle()
     {
+        // 👇 Rispetta la condizione
+        if (!canBeOpened)
+        {
+            Debug.Log("🚪 Porta bloccata, non può essere aperta.");
+            return;
+        }
+
         isDoorOpen = !isDoorOpen;
         StopAllCoroutines();
         StartCoroutine(SlideDoor(isDoorOpen));
