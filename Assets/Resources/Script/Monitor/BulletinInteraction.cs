@@ -5,7 +5,7 @@ public class BulletinInteraction : MonoBehaviour
     [Header("Refs")]
     public Transform cameraTargetPosition;
     public BulletinController bulletinController;
-    public CameraInteractor cameraInteractor; // 👈 nuovo
+    public CameraInteractor cameraInteractor;
 
     [Header("Input Gate")]
     public float reopenCooldown = 0.20f;
@@ -30,6 +30,9 @@ public class BulletinInteraction : MonoBehaviour
             {
                 bulletinController.EnterInteraction(this);
                 isInteracting = true;
+
+                // Nascondi HUD
+                HUDManager.Instance?.SetInteracting(true);
             }
         );
     }
@@ -43,6 +46,9 @@ public class BulletinInteraction : MonoBehaviour
             {
                 isInteracting = false;
                 reopenBlockUntil = Time.time + reopenCooldown;
+
+                // Ripristina HUD
+                HUDManager.Instance?.SetInteracting(false);
             }
         );
     }
