@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
@@ -24,6 +25,15 @@ public class BulletinController : MonoBehaviour
     private readonly List<TMP_Text> activeLines = new List<TMP_Text>();
     private readonly List<MenuOption> selectableOptions = new List<MenuOption>();
     private int currentMenuIndex = 0;
+
+    // Live labels
+    private struct LiveLine
+    {
+        public TMP_Text text;
+        public Func<string> getter;
+        public string last;
+    }
+    private readonly List<LiveLine> liveLines = new List<LiveLine>();
 
     // Bridge
     private TMP_Text readingBodyLine;
@@ -73,11 +83,17 @@ public class BulletinController : MonoBehaviour
     public class MenuOption
     {
         public string title;
-        public enum MenuAction { OpenSubmenu, ShowReading, Invoke, Label }
+        public Color? customColor = null;
+
+        public enum MenuAction { OpenSubmenu, ShowReading, Invoke, Label, LiveLabel }
         public MenuAction action;
+
         [TextArea(3, 10)] public List<string> readingPages;
         public List<MenuOption> subOptions;
         public UnityEvent onInvoke;
+
+        // Provider di testo live per le LiveLabel (non serializzato in Inspector).
+        [System.NonSerialized] public Func<string> dynamicTextProvider;
     }
 
     void Awake()
@@ -129,6 +145,29 @@ public class BulletinController : MonoBehaviour
 
     void Update()
     {
+        // --- Aggiornamento etichette live (sempre attive) ---
+        if (liveLines.Count > 0)
+        {
+            bool anyChanged = false;
+            for (int i = 0; i < liveLines.Count; i++)
+            {
+                var ll = liveLines[i];
+                if (!ll.text) continue;
+                string newText = ll.getter != null ? ll.getter() : string.Empty;
+                if (newText != ll.last)
+                {
+                    ll.text.text = newText;
+                    ll.last = newText;
+                    anyChanged = true;
+                }
+                liveLines[i] = ll;
+            }
+
+            if (anyChanged && listPanel)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(listPanel.GetComponent<RectTransform>());
+        }
+
+        // --- Interazione utente solo se attivo ---
         if (!isInteracting) return;
         if (Time.frameCount == openedAtFrame) return;
 
@@ -148,6 +187,7 @@ public class BulletinController : MonoBehaviour
             if (Input.GetKeyDown(nextPageKey)) { NextPage(); PlayMove(); }
         }
     }
+
 
     // ===== API =====
     public void EnterInteraction(BulletinInteraction interaction)
@@ -217,6 +257,8 @@ public class BulletinController : MonoBehaviour
                 break;
 
             case MenuOption.MenuAction.Label:
+            case MenuOption.MenuAction.LiveLabel:
+                // non selezionabili
                 break;
         }
     }
@@ -306,10 +348,18 @@ public class BulletinController : MonoBehaviour
             {
                 if (opt == null) continue;
 
-                if (opt.action == MenuOption.MenuAction.Label)
-                    CreateLabelLine(parent, opt.title);
-                else
-                    CreateSelectableLine(parent, opt.title, opt);
+                switch (opt.action)
+                {
+                    case MenuOption.MenuAction.Label:
+                        CreateLabelLine(parent, opt.title, opt);
+                        break;
+                    case MenuOption.MenuAction.LiveLabel:
+                        CreateLiveLabelLine(parent, opt.dynamicTextProvider);
+                        break;
+                    default:
+                        CreateSelectableLine(parent, opt.title, opt);
+                        break;
+                }
             }
         }
 
@@ -343,16 +393,28 @@ public class BulletinController : MonoBehaviour
     private void CreateSelectableLine(Transform parent, string text, MenuOption opt)
     {
         var t = SpawnLine(parent, text);
-        t.color = selectableNormalColor;
+        t.color = opt.customColor ?? selectableNormalColor;
 
         activeLines.Add(t);
         selectableOptions.Add(opt);
     }
 
-    private void CreateLabelLine(Transform parent, string text)
+    private void CreateLabelLine(Transform parent, string text, MenuOption opt = null)
     {
         var t = SpawnLine(parent, text);
+
+        if (opt != null && opt.customColor.HasValue)
+            t.color = opt.customColor.Value;
+        else
+            t.color = labelColor;
+    }
+
+    private void CreateLiveLabelLine(Transform parent, Func<string> getter)
+    {
+        string initial = getter != null ? getter() : string.Empty;
+        var t = SpawnLine(parent, initial);
         t.color = labelColor;
+        liveLines.Add(new LiveLine { text = t, getter = getter, last = initial });
     }
 
     private void CreateBackLine(Transform parent)
@@ -373,6 +435,7 @@ public class BulletinController : MonoBehaviour
         readingBodyLine = null;
         activeLines.Clear();
         selectableOptions.Clear();
+        liveLines.Clear();
         currentMenuIndex = 0;
     }
 

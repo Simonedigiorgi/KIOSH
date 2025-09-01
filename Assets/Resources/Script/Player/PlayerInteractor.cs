@@ -101,15 +101,10 @@ public class PlayerInteractor : MonoBehaviour
         var door = currentTarget.GetComponentInParent<RoomDoor>();
         if (door == null) return false;
 
+        // ✅ Lasciamo solo il peephole
         if (door.peephole != null && currentTarget.transform == door.peephole)
         {
             door.InteractWithPeephole();
-            return true;
-        }
-
-        if (door.handle != null && currentTarget.transform == door.handle)
-        {
-            door.InteractWithHandle();
             return true;
         }
 

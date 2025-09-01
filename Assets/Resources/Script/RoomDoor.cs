@@ -3,14 +3,11 @@ using UnityEngine;
 
 public class RoomDoor : MonoBehaviour
 {
-    [Header("Debug / Stato")]
-    public bool canBeOpened = true;
-
     [Header("Refs")]
     public Transform handle;
     public Transform peephole;
     public Transform peepholeCameraTarget;
-    public CameraInteractor cameraInteractor; // 👈 nuovo
+    public CameraInteractor cameraInteractor;
 
     [Header("Movement")]
     public float slideDistance = 1.2f;
@@ -18,6 +15,11 @@ public class RoomDoor : MonoBehaviour
 
     [Header("Camera FX")]
     public float peepholeFOV = 35f;
+
+    [Header("Audio")]
+    public AudioClip sfxOpen;
+    public AudioClip sfxClose;
+    private AudioSource audioSource;
 
     private Vector3 doorClosedPos;
     private Vector3 doorOpenPos;
@@ -36,20 +38,31 @@ public class RoomDoor : MonoBehaviour
 
         peepholeClosedPos = peephole.localPosition;
         peepholeOpenPos = peepholeClosedPos + Vector3.right * 0.25f;
+
+        audioSource = GetComponent<AudioSource>();
+        if (!audioSource) audioSource = gameObject.AddComponent<AudioSource>();
+        audioSource.playOnAwake = false;
     }
 
-    // ---------- HANDLE ----------
-    public void InteractWithHandle()
+    // ---------- CONTROLLO PORTA SOLO DA SCRIPT ----------
+    public void OpenDoor()
     {
-        if (!canBeOpened)
-        {
-            Debug.Log("🚪 Porta bloccata, non può essere aperta.");
-            return;
-        }
+        if (isDoorOpen) return;
 
-        isDoorOpen = !isDoorOpen;
+        isDoorOpen = true;
         StopAllCoroutines();
-        StartCoroutine(SlideDoor(isDoorOpen));
+        StartCoroutine(SlideDoor(true));
+        if (sfxOpen) audioSource.PlayOneShot(sfxOpen);
+    }
+
+    public void CloseDoor()
+    {
+        if (!isDoorOpen) return;
+
+        isDoorOpen = false;
+        StopAllCoroutines();
+        StartCoroutine(SlideDoor(false));
+        if (sfxClose) audioSource.PlayOneShot(sfxClose);
     }
 
     private IEnumerator SlideDoor(bool open)
