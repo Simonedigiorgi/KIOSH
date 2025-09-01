@@ -12,6 +12,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float groundCheckDistance = 0.4f;
     [SerializeField] private LayerMask groundMask;
 
+    [Header("References")]
+    [SerializeField] private Animator animator; // 👈 Aggancia qui l'Animator del Model
+
     private Transform cameraTransform;
     private CharacterController controller;
     private float xRotation = 0f;
@@ -48,7 +51,19 @@ public class PlayerController : MonoBehaviour
 
         Vector3 move = transform.right * moveX + transform.forward * moveZ;
         controller.Move(move * speed * Time.deltaTime);
+
+        // ---- DRIVE ANIMATOR BY PLANAR VELOCITY ----
+        if (animator != null)
+        {
+            Vector3 planar = controller.velocity;
+            planar.y = 0f;
+            float planarSpeed = planar.magnitude;
+
+            // damping per evitare flicker (0.1s)
+            animator.SetFloat("Speed", planarSpeed, 0.1f, Time.deltaTime);
+        }
     }
+
 
     void HandleCameraRotation()
     {
