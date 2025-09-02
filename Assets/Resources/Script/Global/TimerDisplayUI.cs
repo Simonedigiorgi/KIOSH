@@ -1,76 +1,172 @@
+﻿using TMPro;
 using UnityEngine;
-using TMPro;
 
-[DisallowMultipleComponent]
 public class TimerDisplayUI : MonoBehaviour
 {
     [Header("UI")]
-    public TMP_Text line;
+    public TMP_Text label;
 
-    [Header("Labels")]
-    public string mainPrefix = "Timer: ";
-    public string reentryPrefix = "Rientro: ";
-    public string idleText = "Timer: 00:00:000";
+    [Header("Testo pre-reentry")]
+    [Tooltip("Testo mostrato tra congelamento e avvio reentry.")]
+    public string preReentryText = "Il timer di rientro si avvierà presto";
+    public float freezeToMessageDelay = 1.5f;
+
+    [Header("Testo esito giornata")]
+    public string dayCompleteText = "Giornata completata";
+    public string dayFailedText = "Giornata fallita";
+    public float resultMessageDuration = 2f;
+
+    [Header("Audio")]
+    public AudioSource audioSource;
+    public AudioClip timerLoopClip;
+    public AudioClip timerStopClip;
+
+    private bool lockText = false;
+    private float lockUntil = 0f;
 
     void Awake()
     {
-        if (!line) line = GetComponentInChildren<TMP_Text>(true);
+        if (!audioSource) audioSource = GetComponent<AudioSource>();
     }
 
     void OnEnable()
     {
-        Subscribe(true);
-        ForceRefresh();
+        TimerManager.OnTimerStartedGlobal += OnTimerStarted;
+        TimerManager.OnTimerCompletedGlobal += OnTimerCompleted;
+        TimerManager.OnReentryStartedGlobal += OnReentryStarted;
+        TimerManager.OnReentryCompletedGlobal += OnReentryCompleted;
+        DeliveryBulletinAdapter.OnAllDeliveriesCompleted += OnAllDeliveriesCompleted;
+
+        if (label) label.text = "Timer: 00:00:000";
     }
 
     void OnDisable()
     {
-        Subscribe(false);
+        TimerManager.OnTimerStartedGlobal -= OnTimerStarted;
+        TimerManager.OnTimerCompletedGlobal -= OnTimerCompleted;
+        TimerManager.OnReentryStartedGlobal -= OnReentryStarted;
+        TimerManager.OnReentryCompletedGlobal -= OnReentryCompleted;
+        DeliveryBulletinAdapter.OnAllDeliveriesCompleted -= OnAllDeliveriesCompleted;
     }
 
     void Update()
     {
-        // Manteniamo il testo aggiornato anche senza eventi (es. cambio scena)
-        Refresh();
-    }
-
-    void Subscribe(bool on)
-    {
-        if (on)
-        {
-            TimerManager.OnTimerStartedGlobal += ForceRefresh;
-            TimerManager.OnTimerCompletedGlobal += ForceRefresh;
-            TimerManager.OnReentryStartedGlobal += ForceRefresh;
-            TimerManager.OnReentryCompletedGlobal += ForceRefresh;
-        }
-        else
-        {
-            TimerManager.OnTimerStartedGlobal -= ForceRefresh;
-            TimerManager.OnTimerCompletedGlobal -= ForceRefresh;
-            TimerManager.OnReentryStartedGlobal -= ForceRefresh;
-            TimerManager.OnReentryCompletedGlobal -= ForceRefresh;
-        }
-    }
-
-    void ForceRefresh() => Refresh();
-
-    void Refresh()
-    {
-        if (!line) return;
-
         var tm = TimerManager.Instance;
-        if (tm == null)
+        if (!label || tm == null) return;
+
+        if (lockText && Time.time < lockUntil) return;
+        lockText = false;
+
+        if (tm.IsReentryActive)
         {
-            line.text = idleText;
+            label.text = "Rientro: " + TimerManager.FormatTime(tm.ReentryRemainingSeconds);
             return;
         }
 
-        if (tm.IsReentryActive)
-            line.text = reentryPrefix + TimerManager.FormatTime(tm.ReentryRemainingSeconds);
-        else if (tm.IsRunning)
-            line.text = mainPrefix + TimerManager.FormatTime(tm.RemainingSeconds);
+        if (tm.IsRunning)
+        {
+            label.text = "Timer: " + TimerManager.FormatTime(tm.RemainingSeconds);
+            return;
+        }
+    }
+
+    private void OnTimerStarted()
+    {
+        if (audioSource && timerLoopClip)
+        {
+            audioSource.loop = true;
+            audioSource.clip = timerLoopClip;
+            audioSource.Play();
+        }
+    }
+
+    private void OnTimerCompleted()
+    {
+        StopLoopPlayStop();
+        if (label) label.text = "Timer: 00:00:000";
+    }
+
+    private void OnAllDeliveriesCompleted()
+    {
+        var tm = TimerManager.Instance;
+        if (!tm || !label) return;
+
+        label.text = "Timer: " + TimerManager.FormatTime(tm.RemainingSeconds);
+
+        StopLoopPlayStop();
+
+        if (freezeToMessageDelay > 0f)
+        {
+            lockText = true;
+            lockUntil = Time.time + freezeToMessageDelay;
+            Invoke(nameof(ShowPreReentryMessage), freezeToMessageDelay);
+        }
         else
-            // prima dell�avvio o appena scaduto (in attesa di reentry)
-            line.text = idleText;
+        {
+            ShowPreReentryMessage();
+        }
+    }
+
+    private void ShowPreReentryMessage()
+    {
+        if (!label) return;
+
+        label.text = preReentryText;
+
+        var tm = TimerManager.Instance;
+        if (tm)
+        {
+            lockText = true;
+            lockUntil = Time.time + tm.reentryDelayOnAllDelivered;
+
+            Invoke(nameof(StartReentryFromUI), tm.reentryDelayOnAllDelivered);
+        }
+    }
+    private void StartReentryFromUI()
+    {
+        TimerManager.Instance?.StartReentryCountdown();
+    }
+
+    private void OnReentryStarted()
+    {
+        lockText = false;
+        if (audioSource && timerLoopClip)
+        {
+            audioSource.loop = true;
+            audioSource.clip = timerLoopClip;
+            audioSource.Play();
+        }
+    }
+    private void OnReentryCompleted()
+    {
+        StopLoopPlayStop();
+
+        var tm = TimerManager.Instance;
+        if (!label || tm == null) return;
+
+        if (tm.IsPlayerInsideRoom)
+        {
+            label.text = dayCompleteText;
+        }
+        else
+        {
+            label.text = dayFailedText;
+        }
+
+        if (resultMessageDuration > 0f)
+        {
+            lockText = true;
+            lockUntil = Time.time + resultMessageDuration;
+        }
+    }
+
+    private void StopLoopPlayStop()
+    {
+        if (audioSource)
+        {
+            if (audioSource.isPlaying) audioSource.Stop();
+            audioSource.loop = false;
+            if (timerStopClip) audioSource.PlayOneShot(timerStopClip);
+        }
     }
 }

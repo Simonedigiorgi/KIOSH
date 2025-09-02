@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class ZoneTrigger : MonoBehaviour
 {
@@ -8,8 +8,8 @@ public class ZoneTrigger : MonoBehaviour
     [Header("Trigger Behavior")]
     public bool fireOnce = true;
 
-    // privato come richiesto (serializzato per comodit� in Inspector)
-    private bool resetOnWorkdayStart = true;
+    // privato ma visibile in Inspector
+    [SerializeField] private bool resetOnWorkdayStart = true;
 
     // la porta viene risolta automaticamente via tag "RoomDoor"
     private RoomDoor linkedDoor;
@@ -17,11 +17,8 @@ public class ZoneTrigger : MonoBehaviour
 
     private void Awake()
     {
-        // Risolvi la porta solo se serve (cucina)
-        if (zoneType == ZoneType.Kitchen)
-        {
-            TryFindDoorByTag();
-        }
+        // Serve alla Kitchen; lo lasciamo risolto qui.
+        TryFindDoorByTag();
     }
 
     private void OnEnable()
@@ -45,9 +42,12 @@ public class ZoneTrigger : MonoBehaviour
     {
         if (!other.CompareTag("Player")) return;
 
+        var tm = TimerManager.Instance;
+
         if (zoneType == ZoneType.Bedroom)
         {
-            TimerManager.Instance?.SetPlayerInsideRoom(true);
+            // ✅ Delega a TimerManager: chiusura porta + chiusura reentry (se attivo)
+            tm?.SetPlayerInsideRoom(true);
             return;
         }
 
@@ -55,8 +55,7 @@ public class ZoneTrigger : MonoBehaviour
         {
             if (fireOnce && hasFired) return;
 
-            if (linkedDoor == null)
-                TryFindDoorByTag();
+            if (linkedDoor == null) TryFindDoorByTag();
 
             if (linkedDoor != null)
             {

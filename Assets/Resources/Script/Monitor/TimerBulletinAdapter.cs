@@ -7,98 +7,77 @@ public class TimerBulletinAdapter : BulletinAdapterBase
     [Header("UI")]
     public string menuTitle = "Giornata di lavoro";
 
-    [Header("Eventi")]
-    public UnityEvent onTimerStarted;
-    public UnityEvent onTimerCompleted;
-
     private BulletinController controller;
 
     void Awake()
     {
         controller = GetComponentInParent<BulletinController>();
-
-        TimerManager.OnTimerStartedGlobal += HandleTimerStarted;
-        TimerManager.OnTimerCompletedGlobal += HandleTimerCompleted;
-        TimerManager.OnReentryStartedGlobal += HandleTimerChanged;
-        TimerManager.OnReentryCompletedGlobal += HandleTimerChanged;
     }
 
-    void OnDestroy()
+    void OnEnable()
     {
-        TimerManager.OnTimerStartedGlobal -= HandleTimerStarted;
-        TimerManager.OnTimerCompletedGlobal -= HandleTimerCompleted;
-        TimerManager.OnReentryStartedGlobal -= HandleTimerChanged;
-        TimerManager.OnReentryCompletedGlobal -= HandleTimerChanged;
+        DeliveryBulletinAdapter.OnAllDeliveriesCompleted += RefreshPanel;
+        TimerManager.OnReentryStartedGlobal += RefreshPanel;
+        TimerManager.OnReentryCompletedGlobal += RefreshPanel;
+        TimerManager.OnTimerStartedGlobal += RefreshPanel;
+        TimerManager.OnTimerCompletedGlobal += RefreshPanel;
     }
+
+    void OnDisable()
+    {
+        DeliveryBulletinAdapter.OnAllDeliveriesCompleted -= RefreshPanel;
+        TimerManager.OnReentryStartedGlobal -= RefreshPanel;
+        TimerManager.OnReentryCompletedGlobal -= RefreshPanel;
+        TimerManager.OnTimerStartedGlobal -= RefreshPanel;
+        TimerManager.OnTimerCompletedGlobal -= RefreshPanel;
+    }
+
+    private void RefreshPanel() => controller?.RefreshNow();
 
     public override List<BulletinController.MenuOption> BuildOptions(List<BulletinController.MenuOption> baseOptions)
     {
-        var list = baseOptions != null ? new List<BulletinController.MenuOption>(baseOptions)
-                                       : new List<BulletinController.MenuOption>();
+        var list = (baseOptions != null) ? new List<BulletinController.MenuOption>(baseOptions)
+                                         : new List<BulletinController.MenuOption>();
 
         var tm = TimerManager.Instance;
 
-        // Se timer o reentry attivi → NON mostrare il submenu (voce nascosta)
-        if (tm != null && (tm.IsRunning || tm.IsReentryActive))
+        // Se timer principale o reentry sono attivi, NON aggiungiamo nulla a questo pannello.
+        if (tm != null && (tm.IsRunning || tm.IsReentryActive || tm.IsFrozenAwaitingReentry))
             return list;
 
-        // Altrimenti mostra il submenu "Giornata di lavoro" con il bottone Avvia (evita duplicati)
-        if (!list.Exists(o => o != null && o.title == menuTitle))
+        // Evita doppione
+        if (list.Exists(o => o != null && o.title == menuTitle))
+            return list;
+
+        var submenu = new BulletinController.MenuOption
         {
-            var submenu = new BulletinController.MenuOption
-            {
-                title = menuTitle,
-                action = BulletinController.MenuOption.MenuAction.OpenSubmenu,
-                subOptions = new List<BulletinController.MenuOption>()
-            };
+            title = menuTitle,
+            action = BulletinController.MenuOption.MenuAction.OpenSubmenu,
+            subOptions = new List<BulletinController.MenuOption>()
+        };
 
-            submenu.subOptions.Add(new BulletinController.MenuOption
-            {
-                action = BulletinController.MenuOption.MenuAction.LiveLabel,
-                dynamicTextProvider = () => "Timer inattivo"
-            });
-
-            var start = new BulletinController.MenuOption
-            {
-                title = "Avvia la giornata di lavoro",
-                action = BulletinController.MenuOption.MenuAction.Invoke,
-                onInvoke = new UnityEvent()
-            };
-            start.onInvoke.AddListener(StartTimerFromThisPanel);
-            submenu.subOptions.Add(start);
-
-            list.Add(submenu);
-        }
-
-        return list;
-    }
-
-    private void StartTimerFromThisPanel()
-    {
-        if (TimerManager.Instance != null)
+        // Stato
+        submenu.subOptions.Add(new BulletinController.MenuOption
         {
-            TimerManager.Instance.StartTimer();
+            action = BulletinController.MenuOption.MenuAction.LiveLabel,
+            dynamicTextProvider = () => "Timer inattivo"
+        });
+
+        // Pulsante avvio
+        var start = new BulletinController.MenuOption
+        {
+            title = "Avvia la giornata di lavoro",
+            action = BulletinController.MenuOption.MenuAction.Invoke,
+            onInvoke = new UnityEvent()
+        };
+        start.onInvoke.AddListener(() =>
+        {
+            TimerManager.Instance?.StartTimer();
             controller?.RefreshNow();
-        }
-    }
+        });
+        submenu.subOptions.Add(start);
 
-    private void HandleTimerStarted()
-    {
-        onTimerStarted?.Invoke();
-        RefreshAllBoards();
-    }
-
-    private void HandleTimerCompleted()
-    {
-        onTimerCompleted?.Invoke();
-        RefreshAllBoards();
-    }
-
-    private void HandleTimerChanged() => RefreshAllBoards();
-
-    private void RefreshAllBoards()
-    {
-        var controllers = Object.FindObjectsOfType<BulletinController>();
-        foreach (var c in controllers) c.RefreshNow();
+        list.Add(submenu);
+        return list;
     }
 }
