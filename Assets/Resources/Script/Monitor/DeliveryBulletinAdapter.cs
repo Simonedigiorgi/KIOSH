@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class DeliveryBulletinAdapter : BulletinAdapterBase
@@ -14,6 +15,15 @@ public class DeliveryBulletinAdapter : BulletinAdapterBase
     [Header("Progress")]
     public string progressFormat = "Piatti spediti: {0}/{1}";
 
+    // Evento statico globale (resta qui, niente GameEvents)
+    public static event Action OnAllDeliveriesCompleted;
+
+    // Raiser pubblico (l’unico punto che invoca l’evento)
+    public static void RaiseAllDeliveriesCompleted()
+    {
+        OnAllDeliveriesCompleted?.Invoke();
+    }
+
     public override List<BulletinController.MenuOption> BuildOptions(List<BulletinController.MenuOption> baseOptions)
     {
         var list = (baseOptions != null) ? new List<BulletinController.MenuOption>(baseOptions)
@@ -21,11 +31,7 @@ public class DeliveryBulletinAdapter : BulletinAdapterBase
 
         if (!deliveryBox)
         {
-            list.Add(new BulletinController.MenuOption
-            {
-                title = "Piatti spediti: 0/?",
-                action = BulletinController.MenuOption.MenuAction.Label
-            });
+            list.Add(new BulletinController.MenuOption { title = "Piatti spediti: 0/?", action = BulletinController.MenuOption.MenuAction.Label });
             list.Add(new BulletinController.MenuOption
             {
                 title = "Spedisci",
@@ -36,13 +42,12 @@ public class DeliveryBulletinAdapter : BulletinAdapterBase
         }
 
         // Progresso
-        string progress = string.Format(string.IsNullOrEmpty(progressFormat) ? "Piatti spediti: {0}/{1}" : progressFormat,
-                                        DeliveryBox.TotalDelivered, deliveryBox.deliveryGoal);
-        list.Add(new BulletinController.MenuOption
-        {
-            title = progress,
-            action = BulletinController.MenuOption.MenuAction.Label
-        });
+        string progress = string.Format(
+            string.IsNullOrEmpty(progressFormat) ? "Piatti spediti: {0}/{1}" : progressFormat,
+            DeliveryBox.TotalDelivered, deliveryBox.deliveryGoal
+        );
+
+        list.Add(new BulletinController.MenuOption { title = progress, action = BulletinController.MenuOption.MenuAction.Label });
 
         if (deliveryBox.IsDoorOpen)
         {

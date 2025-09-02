@@ -17,15 +17,18 @@ public class TimerBulletinAdapter : BulletinAdapterBase
     {
         controller = GetComponentInParent<BulletinController>();
 
-        // iscrizione agli eventi globali
         TimerManager.OnTimerStartedGlobal += HandleTimerStarted;
         TimerManager.OnTimerCompletedGlobal += HandleTimerCompleted;
+        TimerManager.OnReentryStartedGlobal += HandleTimerChanged;
+        TimerManager.OnReentryCompletedGlobal += HandleTimerChanged;
     }
 
     void OnDestroy()
     {
         TimerManager.OnTimerStartedGlobal -= HandleTimerStarted;
         TimerManager.OnTimerCompletedGlobal -= HandleTimerCompleted;
+        TimerManager.OnReentryStartedGlobal -= HandleTimerChanged;
+        TimerManager.OnReentryCompletedGlobal -= HandleTimerChanged;
     }
 
     public override List<BulletinController.MenuOption> BuildOptions(List<BulletinController.MenuOption> baseOptions)
@@ -33,23 +36,35 @@ public class TimerBulletinAdapter : BulletinAdapterBase
         var list = baseOptions != null ? new List<BulletinController.MenuOption>(baseOptions)
                                        : new List<BulletinController.MenuOption>();
 
-        // Se il timer è in esecuzione → mostra solo la riga live in alto
-        if (TimerManager.Instance != null && TimerManager.Instance.IsRunning)
+        var tm = TimerManager.Instance;
+
+        // Se esiste il manager e la giornata e' stata avviata almeno una volta → UNA SOLA RIGA LIVE
+        if (tm != null && tm.HasDayStarted)
         {
             list.Insert(0, new BulletinController.MenuOption
             {
                 action = BulletinController.MenuOption.MenuAction.LiveLabel,
-                dynamicTextProvider = () => "Timer: " + TimerManager.FormatTime(TimerManager.Instance.RemainingSeconds)
+                dynamicTextProvider = () =>
+                {
+                    if (tm.IsReentryActive)
+                        return "Rientro: " + TimerManager.FormatTime(tm.ReentryRemainingSeconds);
+
+                    if (tm.IsRunning)
+                        return "Timer: " + TimerManager.FormatTime(tm.RemainingSeconds);
+
+                    // Timer fermo (appena scaduto e in attesa di reentry)
+                    return "Timer: 00:00:000";
+                }
             });
 
-            return list; // niente submenu
+            // niente submenu in questa fase
+            return list;
         }
 
-        // Evita doppioni se già presente
+        // Altrimenti (prima di avviare) evita doppioni se gia' presente
         if (list.Exists(o => o != null && o.title == menuTitle))
             return list;
 
-        // Submenu per avvio timer
         var submenu = new BulletinController.MenuOption
         {
             title = menuTitle,
@@ -57,19 +72,17 @@ public class TimerBulletinAdapter : BulletinAdapterBase
             subOptions = new List<BulletinController.MenuOption>()
         };
 
-        // Riga stato
         submenu.subOptions.Add(new BulletinController.MenuOption
         {
             action = BulletinController.MenuOption.MenuAction.LiveLabel,
             dynamicTextProvider = () => "Timer inattivo"
         });
 
-        // Pulsante avvio
         var start = new BulletinController.MenuOption
         {
             title = "Avvia la giornata di lavoro",
             action = BulletinController.MenuOption.MenuAction.Invoke,
-            onInvoke = new UnityEvent()
+            onInvoke = new UnityEngine.Events.UnityEvent()
         };
         start.onInvoke.AddListener(StartTimerFromThisPanel);
         submenu.subOptions.Add(start);
@@ -78,15 +91,13 @@ public class TimerBulletinAdapter : BulletinAdapterBase
         return list;
     }
 
+
     private void StartTimerFromThisPanel()
     {
         if (TimerManager.Instance != null)
         {
             TimerManager.Instance.StartTimer();
-
-            // Torna subito al menu principale
-            if (controller)
-                controller.RefreshNow();
+            controller?.RefreshNow();
         }
     }
 
@@ -104,12 +115,11 @@ public class TimerBulletinAdapter : BulletinAdapterBase
         RefreshAllBoards();
     }
 
+    private void HandleTimerChanged() => RefreshAllBoards();
+
     private void RefreshAllBoards()
     {
-        var controllers = FindObjectsOfType<BulletinController>();
-        foreach (var c in controllers)
-        {
-            c.RefreshNow();
-        }
+        var controllers = Object.FindObjectsOfType<BulletinController>();
+        foreach (var c in controllers) c.RefreshNow();
     }
 }

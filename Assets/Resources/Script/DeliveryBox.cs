@@ -72,7 +72,6 @@ public class DeliveryBox : MonoBehaviour
         isDoorOpen = open;
         isDoorAnimating = false;
 
-        // Se c’è un piatto già dentro → può essere preso solo se porta aperta
         if (currentDish != null)
         {
             var pickup = currentDish.GetComponent<PickupObject>();
@@ -93,7 +92,7 @@ public class DeliveryBox : MonoBehaviour
             var pickup = dish.GetComponent<PickupObject>();
             if (pickup != null) pickup.canBePickedUp = isDoorOpen;
         }
-        Debug.Log("📦 Piatto inserito nel delivery box.");
+        Debug.Log("[DeliveryBox] Piatto inserito nel delivery box.");
         NotifyUI();
     }
 
@@ -102,7 +101,7 @@ public class DeliveryBox : MonoBehaviour
         if (currentDish == dish)
         {
             currentDish = null;
-            Debug.Log("📤 Piatto rimosso dalla DeliveryBox.");
+            Debug.Log("[DeliveryBox] Piatto rimosso dalla DeliveryBox.");
             NotifyUI();
         }
     }
@@ -112,23 +111,30 @@ public class DeliveryBox : MonoBehaviour
     {
         if (isDoorOpen)
         {
-            Debug.Log("⛔ Sportello aperto: chiudere per spedire.");
+            Debug.Log("[DeliveryBox] Sportello aperto: chiudere per spedire.");
             return;
         }
         if (currentDish == null) return;
 
         if (!currentDish.IsComplete)
         {
-            Debug.Log("⚠️ Piatto incompleto: non può essere spedito.");
+            Debug.Log("[DeliveryBox] Piatto incompleto: non puo essere spedito.");
             return;
         }
 
-        Debug.Log("🚀 Piatto spedito!");
+        Debug.Log("[DeliveryBox] Piatto spedito!");
         Destroy(currentDish.gameObject);
         currentDish = null;
 
         TotalDelivered++;
         NotifyUI();
+
+        // Check completamento goal qui, non nella board
+        if (TotalDelivered >= deliveryGoal)
+        {
+            Debug.Log("[DeliveryBox] Tutte le consegne completate!");
+            DeliveryBulletinAdapter.RaiseAllDeliveriesCompleted();
+        }
     }
 
     public bool IsOccupied => currentDish != null;
@@ -144,5 +150,4 @@ public class DeliveryBox : MonoBehaviour
         if (bulletinController)
             bulletinController.RefreshNow();
     }
-
 }

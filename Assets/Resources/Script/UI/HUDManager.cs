@@ -15,17 +15,20 @@ public class HUDManager : MonoBehaviour
     public TMP_Text dialogText;
     public GameObject dialogPanel;
 
+    [Header("Blackout")]
+    public GameObject blackoutPanel; // Pannello nero a schermo intero (Canvas UI)
+
     [Header("Dialog Input")]
     public KeyCode advanceKey = KeyCode.E;
     [Tooltip("Piccolo ritardo per evitare che il primo E salti subito la prima riga")]
     public float advanceDebounce = 0.15f;
 
-    // Stato
+    // Stato dialoghi
     private readonly Queue<string> dialogQueue = new Queue<string>();
     private bool isShowingDialog = false;
-    private float allowAdvanceAt = 0f;     // gate anti-skip
+    private float allowAdvanceAt = 0f;
 
-    // Per nascondere crosshair/nome durante interazioni (es. Bulletin)
+    // Stato interazioni (es. Board)
     private bool isInteracting = false;
 
     private PlayerInteractor interactor;
@@ -45,12 +48,17 @@ public class HUDManager : MonoBehaviour
         playerController = FindObjectOfType<PlayerController>();
 
         ClearTargetText();
-        if (dialogPanel) dialogPanel.SetActive(false);
+
+        if (dialogPanel)
+            dialogPanel.SetActive(false);
+
+        if (blackoutPanel)
+            blackoutPanel.SetActive(false); // spento all’avvio
     }
 
     void Update()
     {
-        // Dialog aperto: nascondi HUD base e ascolta Advance
+        // --- Dialoghi bloccanti ---
         if (isShowingDialog)
         {
             HideUI();
@@ -61,19 +69,19 @@ public class HUDManager : MonoBehaviour
             return;
         }
 
-        // Interazione speciale (es. Bulletin)
+        // --- Interazioni speciali (es. Bulletin) ---
         if (isInteracting)
         {
             HideUI();
             return;
         }
 
-        // HUD normale
+        // --- HUD normale ---
         ShowUI();
         UpdateTargetNameFromInteractor();
     }
 
-    // ---------- Nome target ----------
+    // ---------- Target ----------
     void UpdateTargetNameFromInteractor()
     {
         if (interactor != null && interactor.currentTargetName != null)
@@ -96,13 +104,20 @@ public class HUDManager : MonoBehaviour
         if (targetNameText) targetNameText.enabled = true;
     }
 
-    // ---------- Per Bulletin / interazioni che non sono dialoghi ----------
+    // ---------- Interazioni ----------
     public void SetInteracting(bool value)
     {
         isInteracting = value;
     }
 
-    // ---------- DIALOG (bloccante) ----------
+    // ---------- Blackout ----------
+    public void ShowBlackout()
+    {
+        if (blackoutPanel)
+            blackoutPanel.SetActive(true);
+    }
+
+    // ---------- Dialoghi ----------
     public void ShowDialog(HUDMessageSet messageSet)
     {
         if (messageSet == null || messageSet.lines == null || messageSet.lines.Length == 0)
@@ -129,11 +144,10 @@ public class HUDManager : MonoBehaviour
         // blocca movimento/rotazione player
         playerController?.SetControlsEnabled(false);
 
-        // Mostra subito la PRIMA riga SENZA consumare E nello stesso frame
         if (dialogText && dialogQueue.Count > 0)
             dialogText.text = dialogQueue.Peek();
 
-        // gate anti-skip
+        // evita skip immediato
         allowAdvanceAt = Time.time + advanceDebounce;
     }
 
