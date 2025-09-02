@@ -37,9 +37,6 @@ public class TimerManager : MonoBehaviour
     // Stato consegne
     private bool allDeliveriesCompleted = false;
 
-    // Serve per mostrare una sola riga in alto dopo aver avviato la giornata
-    public bool HasDayStarted { get; private set; } = false;
-
     public bool IsRunning => running;
     public float RemainingSeconds => remaining;
 
@@ -60,18 +57,16 @@ public class TimerManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
-
         Instance = this;
         DontDestroyOnLoad(gameObject);
     }
 
-    private void OnEnable()
+    void OnEnable()
     {
-        // Ascolto quando vengono completate tutte le consegne
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted += HandleAllDeliveriesCompleted;
     }
 
-    private void OnDisable()
+    void OnDisable()
     {
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted -= HandleAllDeliveriesCompleted;
     }
@@ -79,8 +74,6 @@ public class TimerManager : MonoBehaviour
     private void HandleAllDeliveriesCompleted()
     {
         allDeliveriesCompleted = true;
-        // Non facciamo partire qui il reentry: lo faremo SOLO quando scade il timer principale.
-        // Qui non apriamo ancora la porta: la apriremo a scadenza timer (richiesta specifica).
     }
 
     void Update()
@@ -108,7 +101,6 @@ public class TimerManager : MonoBehaviour
 
         remaining = seconds;
         running = seconds > 0f;
-        HasDayStarted = running;
 
         if (running)
         {
@@ -138,15 +130,11 @@ public class TimerManager : MonoBehaviour
         // Se TUTTE le consegne sono state fatte:
         if (allDeliveriesCompleted)
         {
-            // Apri la porta camera
             var door = bedroomDoor != null ? bedroomDoor : FindObjectOfType<RoomDoor>();
             door?.OpenDoor();
-
-            // Attendi X secondi e poi avvia reentry
             StartCoroutine(StartReentryAfterDelay(reentryDelayBeforeStart));
         }
-        // Se NON sono state fatte tutte le consegne, PlayerDeathManager si occupera' della punizione
-        // ascoltando OnTimerCompletedGlobal.
+        // Altrimenti PlayerDeathManager gestisce la punizione.
     }
 
     private IEnumerator StartReentryAfterDelay(float delay)
@@ -178,6 +166,19 @@ public class TimerManager : MonoBehaviour
 
         OnReentryCompletedGlobal?.Invoke();
         onReentryCompleted?.Invoke();
+    }
+
+    // ====== Reset totale per reload/nuova partita ======
+    public void ResetToIdle()
+    {
+        running = false;
+        remaining = 0f;
+
+        reentryActive = false;
+        reentryRemaining = 0f;
+
+        playerInsideRoom = false;
+        allDeliveriesCompleted = false;
     }
 
     // ====== Player state ======

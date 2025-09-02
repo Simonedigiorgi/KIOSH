@@ -38,59 +38,40 @@ public class TimerBulletinAdapter : BulletinAdapterBase
 
         var tm = TimerManager.Instance;
 
-        // Se esiste il manager e la giornata e' stata avviata almeno una volta → UNA SOLA RIGA LIVE
-        if (tm != null && tm.HasDayStarted)
+        // Se timer o reentry attivi → NON mostrare il submenu (voce nascosta)
+        if (tm != null && (tm.IsRunning || tm.IsReentryActive))
+            return list;
+
+        // Altrimenti mostra il submenu "Giornata di lavoro" con il bottone Avvia (evita duplicati)
+        if (!list.Exists(o => o != null && o.title == menuTitle))
         {
-            list.Insert(0, new BulletinController.MenuOption
+            var submenu = new BulletinController.MenuOption
+            {
+                title = menuTitle,
+                action = BulletinController.MenuOption.MenuAction.OpenSubmenu,
+                subOptions = new List<BulletinController.MenuOption>()
+            };
+
+            submenu.subOptions.Add(new BulletinController.MenuOption
             {
                 action = BulletinController.MenuOption.MenuAction.LiveLabel,
-                dynamicTextProvider = () =>
-                {
-                    if (tm.IsReentryActive)
-                        return "Rientro: " + TimerManager.FormatTime(tm.ReentryRemainingSeconds);
-
-                    if (tm.IsRunning)
-                        return "Timer: " + TimerManager.FormatTime(tm.RemainingSeconds);
-
-                    // Timer fermo (appena scaduto e in attesa di reentry)
-                    return "Timer: 00:00:000";
-                }
+                dynamicTextProvider = () => "Timer inattivo"
             });
 
-            // niente submenu in questa fase
-            return list;
+            var start = new BulletinController.MenuOption
+            {
+                title = "Avvia la giornata di lavoro",
+                action = BulletinController.MenuOption.MenuAction.Invoke,
+                onInvoke = new UnityEvent()
+            };
+            start.onInvoke.AddListener(StartTimerFromThisPanel);
+            submenu.subOptions.Add(start);
+
+            list.Add(submenu);
         }
 
-        // Altrimenti (prima di avviare) evita doppioni se gia' presente
-        if (list.Exists(o => o != null && o.title == menuTitle))
-            return list;
-
-        var submenu = new BulletinController.MenuOption
-        {
-            title = menuTitle,
-            action = BulletinController.MenuOption.MenuAction.OpenSubmenu,
-            subOptions = new List<BulletinController.MenuOption>()
-        };
-
-        submenu.subOptions.Add(new BulletinController.MenuOption
-        {
-            action = BulletinController.MenuOption.MenuAction.LiveLabel,
-            dynamicTextProvider = () => "Timer inattivo"
-        });
-
-        var start = new BulletinController.MenuOption
-        {
-            title = "Avvia la giornata di lavoro",
-            action = BulletinController.MenuOption.MenuAction.Invoke,
-            onInvoke = new UnityEngine.Events.UnityEvent()
-        };
-        start.onInvoke.AddListener(StartTimerFromThisPanel);
-        submenu.subOptions.Add(start);
-
-        list.Add(submenu);
         return list;
     }
-
 
     private void StartTimerFromThisPanel()
     {
@@ -103,14 +84,12 @@ public class TimerBulletinAdapter : BulletinAdapterBase
 
     private void HandleTimerStarted()
     {
-        Debug.Log("[TimerBulletinAdapter] Timer partito");
         onTimerStarted?.Invoke();
         RefreshAllBoards();
     }
 
     private void HandleTimerCompleted()
     {
-        Debug.Log("[TimerBulletinAdapter] Timer completato");
         onTimerCompleted?.Invoke();
         RefreshAllBoards();
     }
