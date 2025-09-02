@@ -23,6 +23,13 @@ public class DeliveryBox : MonoBehaviour
     [SerializeField] private BulletinController bulletinController;
     [SerializeField] private DeliveryBulletinAdapter bulletinAdapter;
 
+    // Reset automatico dei contatori statici ad ogni load di scena
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void ResetStaticsOnSceneLoad()
+    {
+        TotalDelivered = 0;
+    }
+
     void Awake()
     {
         if (!bulletinController)
