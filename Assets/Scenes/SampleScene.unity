@@ -16926,8 +16926,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   speed: 2
-  mouseSensitivity: 450
-  groundCheckDistance: 0.4
+  mouseSensitivity: 150
+  minLookAngle: -80
+  maxLookAngle: 80
   groundMask:
     serializedVersion: 2
     m_Bits: 64
