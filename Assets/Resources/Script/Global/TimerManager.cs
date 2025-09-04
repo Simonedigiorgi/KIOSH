@@ -24,20 +24,20 @@ public class TimerManager : MonoBehaviour
     public UnityEvent onReentryStarted;
     public UnityEvent onReentryCompleted;
 
-    // ----- Stato timer principale -----
+    // Stato timer principale
     private bool running;
     private float remaining;
 
-    // ----- Stato reentry -----
+    // Stato reentry
     private bool reentryActive;
     private float reentryRemaining;
     private Coroutine reentryRoutine;
 
-    // ----- Stato vario -----
+    // Stato vario
     private bool playerInsideRoom = false;
     private bool deliveriesCompleted = false;
 
-    // ----- API stato -----
+    // API stato
     public bool IsRunning => running;
     public float RemainingSeconds => remaining;
     public bool IsReentryActive => reentryActive;
@@ -45,7 +45,7 @@ public class TimerManager : MonoBehaviour
     public bool IsPlayerInsideRoom => playerInsideRoom;
     public bool IsFrozenAwaitingReentry => deliveriesCompleted && !running && !reentryActive;
 
-    // ----- Eventi statici globali -----
+    // Eventi statici globali
     public static event Action OnTimerStartedGlobal;
     public static event Action OnTimerCompletedGlobal;
     public static event Action OnReentryStartedGlobal;
@@ -78,7 +78,7 @@ public class TimerManager : MonoBehaviour
 
     public void StartTimer(float seconds)
     {
-        CancelReentry();                 // nel dubbio, ripulisci il reentry
+        CancelReentry(); // ripulisci il reentry
 
         remaining = Mathf.Max(0f, seconds);
         running = remaining > 0f;
@@ -86,7 +86,6 @@ public class TimerManager : MonoBehaviour
 
         if (running)
         {
-            // Apri la porta non appena il timer parte
             var door = bedroomDoor ? bedroomDoor : FindObjectOfType<RoomDoor>();
             door?.OpenDoor();
 
@@ -108,37 +107,34 @@ public class TimerManager : MonoBehaviour
 
         OnTimerCompletedGlobal?.Invoke();
         onTimerCompleted?.Invoke();
-        // Punizione gestita da PlayerDeathManager se necessario.
     }
 
-    // ===== Consegne completate -> freeze + avvio reentry =====
+    // ===== Consegne completate =====
     private void HandleAllDeliveriesCompleted()
     {
         deliveriesCompleted = true;
         if (!running) return;
 
-        running = false; // freeze al valore corrente
+        running = false; // freeze
 
         var door = bedroomDoor ? bedroomDoor : FindObjectOfType<RoomDoor>();
         door?.OpenDoor();
 
-        // ❌ Niente StartCoroutine qui
-        // Sarà il TimerDisplayUI a decidere quando chiamare StartReentryCountdown
-    }
-
-    private IEnumerator StartReentryAfterDelay(float delay)
-    {
-        if (delay > 0f) yield return new WaitForSecondsRealtime(delay);
-        StartReentryCountdown(reentryDurationSeconds);
+        // Somma tempo rimasto + durata reentry
+        float totalReentry = reentryDurationSeconds + remaining;
+        // Lo memorizziamo: TimerDisplayUI lo farà partire dopo il suo delay
+        reentryRemaining = totalReentry;
     }
 
     // ===== Reentry =====
-    public void StartReentryCountdown() => StartReentryCountdown(reentryDurationSeconds);
+    public void StartReentryCountdown()
+    {
+        StartReentryCountdown(reentryRemaining > 0f ? reentryRemaining : reentryDurationSeconds);
+    }
 
     public void StartReentryCountdown(float seconds)
     {
         running = false;
-
         reentryActive = true;
         reentryRemaining = Mathf.Max(0f, seconds);
 
@@ -148,7 +144,6 @@ public class TimerManager : MonoBehaviour
         OnReentryStartedGlobal?.Invoke();
         onReentryStarted?.Invoke();
 
-        // Se sono già in camera quando parte il reentry, chiudilo subito e chiudi la porta
         if (playerInsideRoom)
         {
             var door = bedroomDoor ? bedroomDoor : FindObjectOfType<RoomDoor>();
@@ -159,7 +154,7 @@ public class TimerManager : MonoBehaviour
 
     private IEnumerator ReentryCountdownRoutine()
     {
-        float end = Time.unscaledTime + reentryRemaining;   // tempo di fine in real time
+        float end = Time.unscaledTime + reentryRemaining;
         while (reentryActive)
         {
             reentryRemaining = Mathf.Max(0f, end - Time.unscaledTime);
@@ -203,7 +198,6 @@ public class TimerManager : MonoBehaviour
     {
         playerInsideRoom = inside;
 
-        // Se entro durante il reentry: chiudi la porta SUBITO e completa il reentry
         if (inside && reentryActive)
         {
             var door = bedroomDoor ? bedroomDoor : FindObjectOfType<RoomDoor>();

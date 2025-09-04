@@ -12,8 +12,12 @@ public class TimerDisplayUI : MonoBehaviour
     public float freezeToMessageDelay = 1.5f;
 
     [Header("Testo esito giornata")]
-    public string dayCompleteText = "Giornata completata";
-    public string dayFailedText = "Giornata fallita";
+    public string waitingText = "Waiting for operator C526-2";
+    public string workText = "Do your job";
+    public string jobCompleteText = "Job complete";
+    public string reentryText = "Tempo per rientrare in stanza";
+    public string failText = "Operator C526-2 Fail";
+    public string successText = "Day complete";
     public float resultMessageDuration = 2f;
 
     [Header("Audio")]
@@ -37,7 +41,7 @@ public class TimerDisplayUI : MonoBehaviour
         TimerManager.OnReentryCompletedGlobal += OnReentryCompleted;
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted += OnAllDeliveriesCompleted;
 
-        if (label) label.text = "Timer: 00:00:000";
+        if (label) label.text = waitingText + "\n00:00:000";
     }
 
     void OnDisable()
@@ -59,15 +63,18 @@ public class TimerDisplayUI : MonoBehaviour
 
         if (tm.IsReentryActive)
         {
-            label.text = "Rientro: " + TimerManager.FormatTime(tm.ReentryRemainingSeconds);
+            label.text = reentryText + "\n" + TimerManager.FormatTime(tm.ReentryRemainingSeconds);
             return;
         }
 
         if (tm.IsRunning)
         {
-            label.text = "Timer: " + TimerManager.FormatTime(tm.RemainingSeconds);
+            label.text = workText + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
             return;
         }
+
+        // Timer fermo, non ancora avviato
+        label.text = waitingText + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
     }
 
     private void OnTimerStarted()
@@ -78,12 +85,14 @@ public class TimerDisplayUI : MonoBehaviour
             audioSource.clip = timerLoopClip;
             audioSource.Play();
         }
+
+        if (label) label.text = workText + "\n" + TimerManager.FormatTime(TimerManager.Instance.RemainingSeconds);
     }
 
     private void OnTimerCompleted()
     {
         StopLoopPlayStop();
-        if (label) label.text = "Timer: 00:00:000";
+        if (label) label.text = failText + "\n00:00:000";
     }
 
     private void OnAllDeliveriesCompleted()
@@ -91,10 +100,12 @@ public class TimerDisplayUI : MonoBehaviour
         var tm = TimerManager.Instance;
         if (!tm || !label) return;
 
-        label.text = "Timer: " + TimerManager.FormatTime(tm.RemainingSeconds);
+        // Mostra Job complete + timer fermo
+        label.text = jobCompleteText + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
 
         StopLoopPlayStop();
 
+        // Dopo freezeToMessageDelay → messaggio pre-reentry
         if (freezeToMessageDelay > 0f)
         {
             lockText = true;
@@ -118,10 +129,11 @@ public class TimerDisplayUI : MonoBehaviour
         {
             lockText = true;
             lockUntil = Time.time + tm.reentryDelayOnAllDelivered;
-
             Invoke(nameof(StartReentryFromUI), tm.reentryDelayOnAllDelivered);
         }
     }
+
+
     private void StartReentryFromUI()
     {
         TimerManager.Instance?.StartReentryCountdown();
@@ -137,6 +149,7 @@ public class TimerDisplayUI : MonoBehaviour
             audioSource.Play();
         }
     }
+
     private void OnReentryCompleted()
     {
         StopLoopPlayStop();
@@ -146,17 +159,19 @@ public class TimerDisplayUI : MonoBehaviour
 
         if (tm.IsPlayerInsideRoom)
         {
-            label.text = dayCompleteText;
+            label.text = successText;
+            if (resultMessageDuration > 0f)
+            {
+                lockText = true;
+                lockUntil = Time.time + resultMessageDuration;
+            }
         }
         else
         {
-            label.text = dayFailedText;
-        }
-
-        if (resultMessageDuration > 0f)
-        {
-            lockText = true;
-            lockUntil = Time.time + resultMessageDuration;
+            // Fail → lasciamo il testo fisso fino al reload
+            label.text = failText + "\n00:00:000";
+            lockText = true; // blocca update, non scade mai
+            lockUntil = float.MaxValue;
         }
     }
 

@@ -97,6 +97,7 @@ public class PlayerController : MonoBehaviour
     public void SetControlsEnabled(bool enabled)
     {
         controlsEnabled = enabled;
+        Debug.Log("Controls enabled = " + controlsEnabled);
         if (!enabled)
             velocity = Vector3.zero;
     }
