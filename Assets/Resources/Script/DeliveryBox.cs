@@ -23,6 +23,10 @@ public class DeliveryBox : MonoBehaviour
     [SerializeField] private BulletinController bulletinController;
     [SerializeField] private DeliveryBulletinAdapter bulletinAdapter;
 
+    [Header("Audio")]
+    [SerializeField] private AudioSource audioSource;
+    [SerializeField] private AudioClip deliveryClip; // 🔊 suono alla consegna
+
     // Reset automatico dei contatori statici ad ogni load di scena
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void ResetStaticsOnSceneLoad()
@@ -36,6 +40,9 @@ public class DeliveryBox : MonoBehaviour
             bulletinController = GetComponent<BulletinController>()
                                ?? GetComponentInParent<BulletinController>()
                                ?? GetComponentInChildren<BulletinController>(true);
+
+        if (!audioSource)
+            audioSource = GetComponent<AudioSource>();
     }
 
     // ========== SPORTELLO ==========
@@ -130,6 +137,11 @@ public class DeliveryBox : MonoBehaviour
         }
 
         Debug.Log("[DeliveryBox] Piatto spedito!");
+
+        // 🔊 suono consegna
+        if (audioSource && deliveryClip)
+            audioSource.PlayOneShot(deliveryClip);
+
         Destroy(currentDish.gameObject);
         currentDish = null;
 

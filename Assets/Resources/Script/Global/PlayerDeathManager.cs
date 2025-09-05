@@ -34,7 +34,6 @@ public class PlayerDeathManager : MonoBehaviour
     void OnEnable()
     {
         TimerManager.OnTimerCompletedGlobal += HandleTimerCompleted;
-        TimerManager.OnReentryCompletedGlobal += HandleReentryCompleted;
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted += HandleAllDeliveriesCompleted;
 
         // Nel caso venga abilitato dopo il reload
@@ -44,7 +43,6 @@ public class PlayerDeathManager : MonoBehaviour
     void OnDisable()
     {
         TimerManager.OnTimerCompletedGlobal -= HandleTimerCompleted;
-        TimerManager.OnReentryCompletedGlobal -= HandleReentryCompleted;
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted -= HandleAllDeliveriesCompleted;
     }
 
@@ -83,26 +81,32 @@ public class PlayerDeathManager : MonoBehaviour
     private void HandleAllDeliveriesCompleted()
     {
         allDelivered = true;
-        Debug.Log("[PlayerDeathManager] Tutte le consegne completate (TimerManager gestisce delay e reentry).");
+        Debug.Log("[PlayerDeathManager] Tutte le consegne completate (unico timer attivo; rientra in camera in tempo).");
     }
 
     private void HandleTimerCompleted()
     {
-        if (allDelivered)
+        var tm = TimerManager.Instance;
+
+        // Se non c'è il manager, consideriamo un fallback: punizione
+        if (tm == null)
         {
-            // TimerManager aprira la porta e avviera il reentry dopo il delay configurato.
+            StartCoroutine(PunishmentSequence());
             return;
         }
 
-        // Consegne non completate -> punizione immediata
-        StartCoroutine(PunishmentSequence());
-    }
+        // LOGICA A FINE TIMER (unico timer):
+        // - Se hai consegnato TUTTO e SEI in camera => successo (niente punizione)
+        // - In tutti gli altri casi => punizione
+        if (allDelivered && tm.IsPlayerInsideRoom)
+        {
+            Debug.Log("[PlayerDeathManager] Timer scaduto ma player in camera con consegne completate: successo (nessuna punizione).");
+            // Se vuoi gestire qui un 'success sequence' (blackout morbido/next day), lo puoi aggiungere.
+            return;
+        }
 
-    private void HandleReentryCompleted()
-    {
-        var tm = TimerManager.Instance;
-        if (tm != null && !tm.IsPlayerInsideRoom)
-            StartCoroutine(PunishmentSequence());
+        // Fallimento
+        StartCoroutine(PunishmentSequence());
     }
 
     private IEnumerator PunishmentSequence()

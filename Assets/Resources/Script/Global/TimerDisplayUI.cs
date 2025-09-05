@@ -6,27 +6,23 @@ public class TimerDisplayUI : MonoBehaviour
     [Header("UI")]
     public TMP_Text label;
 
-    [Header("Testo pre-reentry")]
-    [Tooltip("Testo mostrato tra congelamento e avvio reentry.")]
-    public string preReentryText = "Il timer di rientro si avvierà presto";
-    public float freezeToMessageDelay = 1.5f;
-
-    [Header("Testo esito giornata")]
-    public string waitingText = "Waiting for operator C526-2";
-    public string workText = "Do your job";
-    public string jobCompleteText = "Job complete";
-    public string reentryText = "Tempo per rientrare in stanza";
-    public string failText = "Operator C526-2 Fail";
-    public string successText = "Day complete";
-    public float resultMessageDuration = 2f;
-
     [Header("Audio")]
     public AudioSource audioSource;
-    public AudioClip timerLoopClip;
+    public AudioClip timerTickClip;   // singolo "tic"
     public AudioClip timerStopClip;
+    public AudioClip taskCompleteClip; // 🔊 nuovo audio al completamento task
+
+    // 🔒 Testi interni
+    private const string waitingText = "Waiting for operator C526-2";
+    private const string workText = "Do your job";
+    private const string taskCompleteText = "Job complete, return to your room";
+    private const string failText = "Operator C526-2 job failed";
+    private const string successText = "Operator C526-2 day completed";
 
     private bool lockText = false;
-    private float lockUntil = 0f;
+
+    // Per gestire i “tic” ogni secondo
+    private int lastDisplayedSecond = -1;
 
     void Awake()
     {
@@ -37,151 +33,102 @@ public class TimerDisplayUI : MonoBehaviour
     {
         TimerManager.OnTimerStartedGlobal += OnTimerStarted;
         TimerManager.OnTimerCompletedGlobal += OnTimerCompleted;
-        TimerManager.OnReentryStartedGlobal += OnReentryStarted;
-        TimerManager.OnReentryCompletedGlobal += OnReentryCompleted;
-        DeliveryBulletinAdapter.OnAllDeliveriesCompleted += OnAllDeliveriesCompleted;
+        TimerManager.OnTaskCompletedGlobal += OnTaskCompleted;
+        TimerManager.OnDayCompletedGlobal += OnDayCompleted;
 
-        if (label) label.text = waitingText + "\n00:00:000";
+        if (label) label.text = GetWaitingLabelText();
     }
 
     void OnDisable()
     {
         TimerManager.OnTimerStartedGlobal -= OnTimerStarted;
         TimerManager.OnTimerCompletedGlobal -= OnTimerCompleted;
-        TimerManager.OnReentryStartedGlobal -= OnReentryStarted;
-        TimerManager.OnReentryCompletedGlobal -= OnReentryCompleted;
-        DeliveryBulletinAdapter.OnAllDeliveriesCompleted -= OnAllDeliveriesCompleted;
+        TimerManager.OnTaskCompletedGlobal -= OnTaskCompleted;
+        TimerManager.OnDayCompletedGlobal -= OnDayCompleted;
     }
 
     void Update()
     {
         var tm = TimerManager.Instance;
         if (!label || tm == null) return;
-
-        if (lockText && Time.time < lockUntil) return;
-        lockText = false;
-
-        if (tm.IsReentryActive)
-        {
-            label.text = reentryText + "\n" + TimerManager.FormatTime(tm.ReentryRemainingSeconds);
-            return;
-        }
+        if (lockText) return;
 
         if (tm.IsRunning)
         {
-            label.text = workText + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
+            string header = tm.DeliveriesCompleted ? taskCompleteText : workText;
+            label.text = header + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
+
+            // 🎵 Gestione tick audio
+            int currentSecond = Mathf.CeilToInt(tm.RemainingSeconds);
+            if (currentSecond != lastDisplayedSecond && currentSecond > 0)
+            {
+                lastDisplayedSecond = currentSecond;
+                PlayTick();
+            }
             return;
         }
 
         // Timer fermo, non ancora avviato
-        label.text = waitingText + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
+        label.text = GetWaitingLabelText();
+        lastDisplayedSecond = -1; // reset
     }
 
     private void OnTimerStarted()
     {
-        if (audioSource && timerLoopClip)
-        {
-            audioSource.loop = true;
-            audioSource.clip = timerLoopClip;
-            audioSource.Play();
-        }
-
-        if (label) label.text = workText + "\n" + TimerManager.FormatTime(TimerManager.Instance.RemainingSeconds);
+        lastDisplayedSecond = -1; // reset per sicurezza
     }
 
     private void OnTimerCompleted()
     {
-        StopLoopPlayStop();
+        PlayStop();
         if (label) label.text = failText + "\n00:00:000";
+        lockText = true; // resta fisso fino a reload
     }
 
-    private void OnAllDeliveriesCompleted()
+    private void OnTaskCompleted()
     {
         var tm = TimerManager.Instance;
         if (!tm || !label) return;
 
-        // Mostra Job complete + timer fermo
-        label.text = jobCompleteText + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
-
-        StopLoopPlayStop();
-
-        // Dopo freezeToMessageDelay → messaggio pre-reentry
-        if (freezeToMessageDelay > 0f)
-        {
-            lockText = true;
-            lockUntil = Time.time + freezeToMessageDelay;
-            Invoke(nameof(ShowPreReentryMessage), freezeToMessageDelay);
-        }
-        else
-        {
-            ShowPreReentryMessage();
-        }
-    }
-
-    private void ShowPreReentryMessage()
-    {
-        if (!label) return;
-
-        label.text = preReentryText;
-
-        var tm = TimerManager.Instance;
-        if (tm)
-        {
-            lockText = true;
-            lockUntil = Time.time + tm.reentryDelayOnAllDelivered;
-            Invoke(nameof(StartReentryFromUI), tm.reentryDelayOnAllDelivered);
-        }
-    }
-
-
-    private void StartReentryFromUI()
-    {
-        TimerManager.Instance?.StartReentryCountdown();
-    }
-
-    private void OnReentryStarted()
-    {
+        label.text = taskCompleteText + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
         lockText = false;
-        if (audioSource && timerLoopClip)
+
+        // 🔊 suono task completato
+        if (audioSource && taskCompleteClip)
+            audioSource.PlayOneShot(taskCompleteClip);
+    }
+
+    private void OnDayCompleted()
+    {
+        PlayStop();
+        if (label) label.text = successText;
+        lockText = true;
+    }
+
+    private void PlayTick()
+    {
+        if (audioSource && timerTickClip)
+            audioSource.PlayOneShot(timerTickClip);
+    }
+
+    private void PlayStop()
+    {
+        if (audioSource && timerStopClip)
         {
-            audioSource.loop = true;
-            audioSource.clip = timerLoopClip;
-            audioSource.Play();
+            audioSource.Stop();
+            audioSource.PlayOneShot(timerStopClip);
         }
     }
 
-    private void OnReentryCompleted()
+    /// <summary>
+    /// Restituisce il testo da mostrare quando il timer non è ancora avviato.
+    /// </summary>
+    private string GetWaitingLabelText()
     {
-        StopLoopPlayStop();
-
         var tm = TimerManager.Instance;
-        if (!label || tm == null) return;
-
-        if (tm.IsPlayerInsideRoom)
-        {
-            label.text = successText;
-            if (resultMessageDuration > 0f)
-            {
-                lockText = true;
-                lockUntil = Time.time + resultMessageDuration;
-            }
-        }
+        if (tm != null)
+            return waitingText + "\n" + TimerManager.FormatTime(tm.defaultDurationSeconds);
         else
-        {
-            // Fail → lasciamo il testo fisso fino al reload
-            label.text = failText + "\n00:00:000";
-            lockText = true; // blocca update, non scade mai
-            lockUntil = float.MaxValue;
-        }
-    }
-
-    private void StopLoopPlayStop()
-    {
-        if (audioSource)
-        {
-            if (audioSource.isPlaying) audioSource.Stop();
-            audioSource.loop = false;
-            if (timerStopClip) audioSource.PlayOneShot(timerStopClip);
-        }
+            return waitingText + "\n00:00:000";
     }
 }

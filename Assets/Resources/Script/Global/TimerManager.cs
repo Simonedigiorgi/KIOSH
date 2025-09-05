@@ -1,7 +1,5 @@
 ﻿using System;
-using System.Collections;
 using UnityEngine;
-using UnityEngine.Events;
 
 public class TimerManager : MonoBehaviour
 {
@@ -10,52 +8,33 @@ public class TimerManager : MonoBehaviour
     [Header("Durata predefinita")]
     public float defaultDurationSeconds = 300f;
 
-    [Header("Reentry")]
-    public float reentryDurationSeconds = 30f;
-    [Tooltip("Ritardo tra 'consegne completate' e avvio del reentry (il TimerDisplay può mostrare messaggi in questo intervallo).")]
-    public float reentryDelayOnAllDelivered = 4f;
-
-    [Header("Door (opzionale)")]
-    public RoomDoor bedroomDoor;
-
-    [Header("Eventi")]
-    public UnityEvent onTimerStarted;
-    public UnityEvent onTimerCompleted;
-    public UnityEvent onReentryStarted;
-    public UnityEvent onReentryCompleted;
-
-    // Stato timer principale
+    // Stato
     private bool running;
     private float remaining;
-
-    // Stato reentry
-    private bool reentryActive;
-    private float reentryRemaining;
-    private Coroutine reentryRoutine;
-
-    // Stato vario
     private bool playerInsideRoom = false;
     private bool deliveriesCompleted = false;
 
-    // API stato
+    // Cache della porta
+    private RoomDoor roomDoor;
+
+    // API
     public bool IsRunning => running;
     public float RemainingSeconds => remaining;
-    public bool IsReentryActive => reentryActive;
-    public float ReentryRemainingSeconds => reentryRemaining;
     public bool IsPlayerInsideRoom => playerInsideRoom;
-    public bool IsFrozenAwaitingReentry => deliveriesCompleted && !running && !reentryActive;
+    public bool DeliveriesCompleted => deliveriesCompleted;
 
-    // Eventi statici globali
+    // Eventi globali
     public static event Action OnTimerStartedGlobal;
     public static event Action OnTimerCompletedGlobal;
-    public static event Action OnReentryStartedGlobal;
-    public static event Action OnReentryCompletedGlobal;
+    public static event Action OnTaskCompletedGlobal;
+    public static event Action OnDayCompletedGlobal;
 
-    // ===== Lifecycle =====
     void Awake()
     {
         if (Instance && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+
+        CacheRoomDoor();
     }
 
     void OnEnable() => DeliveryBulletinAdapter.OnAllDeliveriesCompleted += HandleAllDeliveriesCompleted;
@@ -69,128 +48,40 @@ public class TimerManager : MonoBehaviour
         if (remaining <= 0f)
         {
             remaining = 0f;
-            CompleteMainTimer();
+            CompleteTimer();
         }
     }
 
-    // ===== Timer principale =====
+    // ===== Timer =====
     public void StartTimer() => StartTimer(defaultDurationSeconds);
 
     public void StartTimer(float seconds)
     {
-        CancelReentry(); // ripulisci il reentry
-
         remaining = Mathf.Max(0f, seconds);
         running = remaining > 0f;
         deliveriesCompleted = false;
 
         if (running)
         {
-            var door = bedroomDoor ? bedroomDoor : FindObjectOfType<RoomDoor>();
-            door?.OpenDoor();
-
+            roomDoor?.OpenDoor();
             OnTimerStartedGlobal?.Invoke();
-            onTimerStarted?.Invoke();
         }
     }
 
-    public void StopTimer()
-    {
-        if (!running) return;
-        running = false;
-    }
-
-    private void CompleteMainTimer()
+    private void CompleteTimer()
     {
         running = false;
         remaining = 0f;
 
         OnTimerCompletedGlobal?.Invoke();
-        onTimerCompleted?.Invoke();
     }
 
-    // ===== Consegne completate =====
+    // ===== Task completato =====
     private void HandleAllDeliveriesCompleted()
     {
         deliveriesCompleted = true;
-        if (!running) return;
-
-        running = false; // freeze
-
-        var door = bedroomDoor ? bedroomDoor : FindObjectOfType<RoomDoor>();
-        door?.OpenDoor();
-
-        // Somma tempo rimasto + durata reentry
-        float totalReentry = reentryDurationSeconds + remaining;
-        // Lo memorizziamo: TimerDisplayUI lo farà partire dopo il suo delay
-        reentryRemaining = totalReentry;
-    }
-
-    // ===== Reentry =====
-    public void StartReentryCountdown()
-    {
-        StartReentryCountdown(reentryRemaining > 0f ? reentryRemaining : reentryDurationSeconds);
-    }
-
-    public void StartReentryCountdown(float seconds)
-    {
-        running = false;
-        reentryActive = true;
-        reentryRemaining = Mathf.Max(0f, seconds);
-
-        if (reentryRoutine != null) StopCoroutine(reentryRoutine);
-        reentryRoutine = StartCoroutine(ReentryCountdownRoutine());
-
-        OnReentryStartedGlobal?.Invoke();
-        onReentryStarted?.Invoke();
-
-        if (playerInsideRoom)
-        {
-            var door = bedroomDoor ? bedroomDoor : FindObjectOfType<RoomDoor>();
-            door?.CloseDoor();
-            CompleteReentry();
-        }
-    }
-
-    private IEnumerator ReentryCountdownRoutine()
-    {
-        float end = Time.unscaledTime + reentryRemaining;
-        while (reentryActive)
-        {
-            reentryRemaining = Mathf.Max(0f, end - Time.unscaledTime);
-            if (reentryRemaining <= 0f)
-            {
-                CompleteReentry();
-                yield break;
-            }
-            yield return null;
-        }
-    }
-
-    private void CompleteReentry()
-    {
-        reentryActive = false;
-        reentryRemaining = 0f;
-
-        if (reentryRoutine != null)
-        {
-            StopCoroutine(reentryRoutine);
-            reentryRoutine = null;
-        }
-
-        OnReentryCompletedGlobal?.Invoke();
-        onReentryCompleted?.Invoke();
-    }
-
-    private void CancelReentry()
-    {
-        reentryActive = false;
-        if (reentryRoutine != null)
-        {
-            StopCoroutine(reentryRoutine);
-            reentryRoutine = null;
-        }
-        reentryRemaining = 0f;
+        roomDoor?.OpenDoor();
+        OnTaskCompletedGlobal?.Invoke();
     }
 
     // ===== Player state =====
@@ -198,24 +89,33 @@ public class TimerManager : MonoBehaviour
     {
         playerInsideRoom = inside;
 
-        if (inside && reentryActive)
+        // ✅ Se il player entra in camera dopo aver completato il task
+        if (inside && deliveriesCompleted && running)
         {
-            var door = bedroomDoor ? bedroomDoor : FindObjectOfType<RoomDoor>();
-            door?.CloseDoor();
-            CompleteReentry();
+            roomDoor?.CloseDoor();
+
+            running = false;
+            OnDayCompletedGlobal?.Invoke();
         }
     }
 
-    // ===== Reset globale =====
     public void ResetToIdle()
     {
         running = false;
         remaining = 0f;
         deliveriesCompleted = false;
-        CancelReentry();
     }
 
     // ===== Utility =====
+    private void CacheRoomDoor()
+    {
+        var go = GameObject.FindWithTag("RoomDoor");
+        roomDoor = go ? go.GetComponent<RoomDoor>() : null;
+
+        if (roomDoor == null)
+            Debug.LogWarning("[TimerManager] Nessuna RoomDoor trovata con tag 'RoomDoor'.");
+    }
+
     public static string FormatTime(float seconds)
     {
         if (seconds <= 0f) return "00:00:000";

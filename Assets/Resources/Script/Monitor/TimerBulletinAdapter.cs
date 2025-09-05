@@ -17,8 +17,6 @@ public class TimerBulletinAdapter : BulletinAdapterBase
     void OnEnable()
     {
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted += RefreshPanel;
-        TimerManager.OnReentryStartedGlobal += RefreshPanel;
-        TimerManager.OnReentryCompletedGlobal += RefreshPanel;
         TimerManager.OnTimerStartedGlobal += RefreshPanel;
         TimerManager.OnTimerCompletedGlobal += RefreshPanel;
     }
@@ -26,8 +24,6 @@ public class TimerBulletinAdapter : BulletinAdapterBase
     void OnDisable()
     {
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted -= RefreshPanel;
-        TimerManager.OnReentryStartedGlobal -= RefreshPanel;
-        TimerManager.OnReentryCompletedGlobal -= RefreshPanel;
         TimerManager.OnTimerStartedGlobal -= RefreshPanel;
         TimerManager.OnTimerCompletedGlobal -= RefreshPanel;
     }
@@ -41,8 +37,8 @@ public class TimerBulletinAdapter : BulletinAdapterBase
 
         var tm = TimerManager.Instance;
 
-        // Se timer principale o reentry sono attivi, NON aggiungiamo nulla a questo pannello.
-        if (tm != null && (tm.IsRunning || tm.IsReentryActive || tm.IsFrozenAwaitingReentry))
+        // Se il timer è attivo, NON aggiungiamo nulla a questo pannello.
+        if (tm != null && tm.IsRunning)
             return list;
 
         // Evita doppione
