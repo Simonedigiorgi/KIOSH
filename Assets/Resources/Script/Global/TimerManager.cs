@@ -17,6 +17,9 @@ public class TimerManager : MonoBehaviour
     // Cache della porta
     private RoomDoor roomDoor;
 
+    private bool dayCompleted = false;
+    public bool DayCompleted => dayCompleted;
+
     // API
     public bool IsRunning => running;
     public float RemainingSeconds => remaining;
@@ -89,22 +92,26 @@ public class TimerManager : MonoBehaviour
     {
         playerInsideRoom = inside;
 
-        // ✅ Se il player entra in camera dopo aver completato il task
-        if (inside && deliveriesCompleted && running)
+        if (inside && deliveriesCompleted)
         {
-            roomDoor?.CloseDoor();
+            var door = FindObjectOfType<RoomDoor>();
+            door?.CloseDoor();
 
-            running = false;
+            if (running) running = false;
+
+            dayCompleted = true; // ✅ segna giornata completata
             OnDayCompletedGlobal?.Invoke();
+            Debug.Log("[TimerManager] Giorno completato: player rientrato in camera.");
         }
     }
-
     public void ResetToIdle()
     {
         running = false;
         remaining = 0f;
         deliveriesCompleted = false;
+        dayCompleted = false; // reset
     }
+
 
     // ===== Utility =====
     private void CacheRoomDoor()

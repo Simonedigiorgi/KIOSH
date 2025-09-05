@@ -91,6 +91,7 @@ public class PlayerInteractor : MonoBehaviour
         if (isHolding && TryCookIngredient()) return;
         if (isHolding && TryObjectReceiver()) return;
         if (!isHolding && TryPickup()) return;
+        if (TryBed()) return; // 👈 aggiunto qui
 
         Debug.Log("⚠️ Nessuna azione disponibile per questo target.");
     }
@@ -220,6 +221,18 @@ public class PlayerInteractor : MonoBehaviour
                 receiver.Unplace(pickup);
 
             PickUp(pickup);
+            return true;
+        }
+        return false;
+    }
+
+    bool TryBed()
+    {
+        var bed = currentTarget.GetComponentInParent<BedInteraction>();
+        if (bed)
+        {
+            var player = FindObjectOfType<PlayerController>();
+            bed.UseBed(player);
             return true;
         }
         return false;

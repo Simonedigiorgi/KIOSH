@@ -1,7 +1,8 @@
-﻿using TMPro;
+﻿using System.Collections;
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections.Generic;
 
 public class HUDManager : MonoBehaviour
 {
@@ -115,6 +116,26 @@ public class HUDManager : MonoBehaviour
     {
         if (blackoutPanel)
             blackoutPanel.SetActive(true);
+    }
+
+    public IEnumerator FadeBlackout(float duration)
+    {
+        if (!blackoutPanel) yield break;
+
+        blackoutPanel.SetActive(true);
+
+        var canvasGroup = blackoutPanel.GetComponent<CanvasGroup>();
+        if (!canvasGroup) canvasGroup = blackoutPanel.AddComponent<CanvasGroup>();
+
+        canvasGroup.alpha = 0f;
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            canvasGroup.alpha = Mathf.Clamp01(t / duration);
+            yield return null;
+        }
+        canvasGroup.alpha = 1f;
     }
 
     // ---------- Dialoghi ----------

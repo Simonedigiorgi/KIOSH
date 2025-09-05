@@ -101,4 +101,27 @@ public class PlayerController : MonoBehaviour
         if (!enabled)
             velocity = Vector3.zero;
     }
+
+    /// <summary>
+    /// Allinea lo stato interno (xRotation) con la rotazione attuale della camera.
+    /// Da chiamare dopo una cutscene per evitare salti.
+    /// </summary>
+    public void SyncCameraRotation()
+    {
+        if (cameraTransform == null) return;
+
+        Vector3 camAngles = cameraTransform.localEulerAngles;
+        xRotation = camAngles.x;
+
+        // Debug per conferma
+        Debug.Log("[PlayerController] SyncCameraRotation → xRotation = " + xRotation);
+    }
+
+    public void ResetCameraRotation()
+    {
+        xRotation = 0f; // resetta il pitch interno
+        if (cameraTransform != null)
+            cameraTransform.localRotation = Quaternion.Euler(0f, 0f, 0f);
+    }
+
 }
