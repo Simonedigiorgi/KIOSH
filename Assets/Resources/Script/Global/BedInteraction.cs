@@ -24,6 +24,7 @@ public class BedInteraction : MonoBehaviour
         {
             if (tm == null || !tm.DayCompleted)
             {
+                HUDManager.Instance.ShowDialog("You cannot sleep: day not completed.");
                 Debug.Log("[BedInteraction] Non puoi dormire: giornata non conclusa.");
                 return;
             }
