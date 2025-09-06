@@ -15,7 +15,7 @@ public class TimerDisplayUI : MonoBehaviour
     // 🔒 Testi interni
     private const string waitingText = "Waiting for operator C526-2";
     private const string workText = "Do your job";
-    private const string taskCompleteText = "Job complete, return to your room";
+    private const string taskCompleteText = "Job complete, return to the room";
     private const string failText = "Operator C526-2 job failed";
     private const string successText = "Operator C526-2 day completed";
 

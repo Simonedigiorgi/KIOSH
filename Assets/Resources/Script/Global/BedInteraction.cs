@@ -5,28 +5,37 @@ using UnityEngine.Playables;
 public class BedInteraction : MonoBehaviour
 {
     [Header("References")]
-    [SerializeField] private Transform sleepPoint;             // Punto dove il player viene teletrasportato
-    [SerializeField] private PlayableDirector wakeUpTimeline;  // Timeline del risveglio
+    [SerializeField] private Transform sleepPoint;
+    [SerializeField] private PlayableDirector wakeUpTimeline;
 
     [Header("Config")]
-    [SerializeField] private float fadeDuration = 2f;   // Tempo del blackout (fade in)
-    [SerializeField] private float sleepDuration = 3f;  // Quanto dura il "sonno" fittizio
+    [SerializeField] private float fadeDuration = 2f;
+    [SerializeField] private float sleepDuration = 3f;
 
     private bool isUsed = false;
 
     public void UseBed(PlayerController player)
     {
         var tm = TimerManager.Instance;
-        if (tm == null || !tm.DayCompleted)   // ✅ Usa solo il flag DayCompleted
+        var gs = GameStateManager.Instance;
+
+        // ✅ Se è mattina, puoi dormire solo se la giornata è conclusa
+        if (gs != null && gs.CurrentPhase == DayPhase.Morning)
         {
-            Debug.Log("[BedInteraction] Non puoi dormire: giornata non conclusa.");
-            return;
+            if (tm == null || !tm.DayCompleted)
+            {
+                Debug.Log("[BedInteraction] Non puoi dormire: giornata non conclusa.");
+                return;
+            }
+        }
+        // ✅ Se è notte, permetti sempre di dormire
+        else if (gs != null && gs.CurrentPhase == DayPhase.Night)
+        {
+            Debug.Log("[BedInteraction] È notte, il letto è sempre usabile.");
         }
 
         if (isUsed) return;
-        isUsed = true;
 
-        // Blocca i controlli
         if (player != null) player.SetControlsEnabled(false);
 
         StartCoroutine(SleepSequence(player));
@@ -34,13 +43,24 @@ public class BedInteraction : MonoBehaviour
 
     private IEnumerator SleepSequence(PlayerController player)
     {
-        // 1. Fade in del nero
-        if (HUDManager.Instance != null)
-            yield return HUDManager.Instance.StartCoroutine(HUDManager.Instance.FadeBlackout(fadeDuration));
-        else
-            yield return new WaitForSeconds(fadeDuration);
+        isUsed = true; // 👈 marcato qui all’avvio della sequenza
 
-        // 2. Teletrasporto del player mentre lo schermo è nero
+        Debug.Log("[BedInteraction] SleepSequence avviata");
+
+        // 1. Fade in nero
+        if (HUDManager.Instance != null)
+        {
+            Debug.Log("[BedInteraction] Avvio fade blackout");
+            yield return HUDManager.Instance.StartCoroutine(HUDManager.Instance.FadeBlackout(fadeDuration));
+            Debug.Log("[BedInteraction] Fine fade blackout");
+        }
+        else
+        {
+            yield return new WaitForSeconds(fadeDuration);
+        }
+
+        // 2. Teletrasporto
+        Debug.Log("[BedInteraction] Teletrasporto player");
         if (player != null && sleepPoint != null)
         {
             var cc = player.GetComponent<CharacterController>();
@@ -48,35 +68,45 @@ public class BedInteraction : MonoBehaviour
             player.transform.position = sleepPoint.position;
             player.transform.rotation = sleepPoint.rotation;
 
-            // ✅ Resetta la camera
             var cam = Camera.main;
             if (cam != null)
-            {
-                cam.transform.localRotation = Quaternion.identity; // resetta rotazione (0,0,0)
-            }
-
-            // Se vuoi resettare anche il pitch del PlayerController
+                cam.transform.localRotation = Quaternion.identity;
             player.ResetCameraRotation();
 
             if (cc != null) cc.enabled = true;
         }
 
-        // 3. Attesa del "sonno"
+        // 3. Sonno fittizio
+        Debug.Log("[BedInteraction] Attesa sonno");
         yield return new WaitForSeconds(sleepDuration);
 
-        // 4. Spegni subito il pannello nero
+        // 4. Spegni pannello nero
+        Debug.Log("[BedInteraction] Spengo blackoutPanel");
         if (HUDManager.Instance?.blackoutPanel != null)
             HUDManager.Instance.blackoutPanel.SetActive(false);
 
-        // 5. Avvia la timeline di risveglio
+        // 5. Avanza fase
+        var gs = GameStateManager.Instance;
+        if (gs != null)
+        {
+            Debug.Log($"[BedInteraction] Prima di AdvancePhase: Giorno {gs.CurrentDay}, Fase {gs.CurrentPhase}");
+            gs.AdvancePhase();
+            Debug.Log($"[BedInteraction] Dopo AdvancePhase: Giorno {gs.CurrentDay}, Fase {gs.CurrentPhase}");
+        }
+
+        // 6. Cutscene risveglio
         if (wakeUpTimeline != null)
         {
             wakeUpTimeline.Play();
-            Debug.Log("[BedInteraction] Giorno terminato → avvio risveglio.");
+            Debug.Log("[BedInteraction] Avvio risveglio (timeline)");
         }
 
-        // 6. Riattiva i controlli
+        // 7. Riattiva controlli
         if (player != null)
             player.SetControlsEnabled(true);
+
+        Debug.Log("[BedInteraction] Sequenza completata");
+
+        isUsed = false; // 👈 reset così puoi riusare il letto al prossimo ciclo
     }
 }
