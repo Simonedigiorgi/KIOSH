@@ -1,10 +1,9 @@
 ﻿using System.Collections;
 using UnityEngine;
 
-public class RoomDoor : MonoBehaviour
+public class RoomDoor : MonoBehaviour, IInteractable
 {
     [Header("Refs")]
-    public Transform handle;
     public Transform peephole;
     public Transform peepholeCameraTarget;
     public CameraInteractor cameraInteractor;
@@ -36,15 +35,41 @@ public class RoomDoor : MonoBehaviour
         doorClosedPos = transform.localPosition;
         doorOpenPos = doorClosedPos + Vector3.right * slideDistance;
 
-        peepholeClosedPos = peephole.localPosition;
-        peepholeOpenPos = peepholeClosedPos + Vector3.right * 0.25f;
+        if (peephole != null)
+        {
+            peepholeClosedPos = peephole.localPosition;
+            peepholeOpenPos = peepholeClosedPos + Vector3.right * 0.25f;
+        }
 
         audioSource = GetComponent<AudioSource>();
         if (!audioSource) audioSource = gameObject.AddComponent<AudioSource>();
         audioSource.playOnAwake = false;
     }
 
-    // ---------- CONTROLLO PORTA SOLO DA SCRIPT ----------
+    // ---------- IInteractable ----------
+    public void Interact(PlayerInteractor interactor)
+    {
+        // Se sto già guardando nello spioncino → E serve a uscire
+        if (isLookingThroughPeephole)
+        {
+            ExitPeephole();
+            return;
+        }
+
+        // Se colpisci lo spioncino (prima di entrarci)
+        if (peephole != null && interactor.currentTarget == peephole.gameObject)
+        {
+            InteractWithPeephole();
+        }
+        else
+        {
+            // Interazione con la porta
+            if (isDoorOpen) CloseDoor();
+            else OpenDoor();
+        }
+    }
+
+    // ---------- Porta ----------
     public void OpenDoor()
     {
         if (isDoorOpen) return;
@@ -79,7 +104,7 @@ public class RoomDoor : MonoBehaviour
         }
     }
 
-    // ---------- PEEPHOLE ----------
+    // ---------- Spioncino ----------
     public void InteractWithPeephole()
     {
         if (isLookingThroughPeephole) ExitPeephole();
@@ -114,6 +139,8 @@ public class RoomDoor : MonoBehaviour
 
     private IEnumerator SlidePeephole(bool open)
     {
+        if (peephole == null) yield break;
+
         Vector3 start = peephole.localPosition;
         Vector3 target = open ? peepholeOpenPos : peepholeClosedPos;
 

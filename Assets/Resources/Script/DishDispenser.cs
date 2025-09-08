@@ -1,12 +1,17 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
-public class DishDispenser : MonoBehaviour
+public class DishDispenser : MonoBehaviour, IInteractable
 {
     public GameObject dishPrefab;
     public int maxDishesInScene = 5;
 
     private List<GameObject> activeDishes = new List<GameObject>();
+
+    public void Interact(PlayerInteractor player)
+    {
+        TryGiveDishToPlayer(player);
+    }
 
     public void TryGiveDishToPlayer(PlayerInteractor player)
     {

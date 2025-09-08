@@ -31,12 +31,6 @@ public class PlayerController : MonoBehaviour
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
-
-        // ignora collisioni Player ↔ Interactable se serve
-        int playerLayer = LayerMask.NameToLayer("Player");
-        int interactableLayer = LayerMask.NameToLayer("Interactable");
-        if (playerLayer >= 0 && interactableLayer >= 0)
-            Physics.IgnoreLayerCollision(playerLayer, interactableLayer, true);
     }
 
     void Update()

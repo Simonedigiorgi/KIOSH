@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-public class BulletinInteraction : MonoBehaviour
+public class BulletinInteraction : MonoBehaviour, IInteractable
 {
     [Header("Refs")]
     public Transform cameraTargetPosition;
@@ -13,6 +13,15 @@ public class BulletinInteraction : MonoBehaviour
 
     private bool isInteracting = false;
 
+    // ---------- IInteractable ----------
+    public void Interact(PlayerInteractor interactor)
+    {
+        if (!isInteracting)
+            EnterInteraction();
+        // 👉 se già dentro, ignora (non uscire!)
+    }
+
+    // ---------- Interazione ----------
     public void EnterInteraction()
     {
         if (Time.time < reopenBlockUntil) return;
@@ -24,18 +33,21 @@ public class BulletinInteraction : MonoBehaviour
             return;
         }
 
+        // 🔒 Blocchiamo subito: la transizione è in corso
+        isInteracting = true;
+
         cameraInteractor.EnterInteraction(
             cameraTargetPosition,
             onComplete: () =>
             {
                 bulletinController.EnterInteraction(this);
-                isInteracting = true;
 
                 // Nascondi HUD
                 HUDManager.Instance?.SetInteracting(true);
             }
         );
     }
+
 
     public void ExitInteraction()
     {

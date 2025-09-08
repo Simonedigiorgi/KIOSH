@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 
-public class ObjectReceiver : MonoBehaviour
+public class ObjectReceiver : MonoBehaviour, IInteractable
 {
     [Header("Settings")]
     public List<PickupType> acceptedTypes;
@@ -21,6 +21,25 @@ public class ObjectReceiver : MonoBehaviour
     public bool CanAccept(PickupObject item)
     {
         return item != null && acceptedTypes.Contains(item.type);
+    }
+
+    public void Interact(PlayerInteractor interactor)
+    {
+        var held = interactor.HeldPickup;
+        if (held != null && CanAccept(held))
+        {
+            Ray ray = new Ray(interactor.transform.position, interactor.transform.forward);
+            if (Physics.Raycast(ray, out RaycastHit hit, 3f))
+                Place(held, hit.point);
+            else
+                Place(held, transform.position);
+
+            interactor.ClearHeld();
+        }
+        else
+        {
+            Debug.Log("⚠️ Nessun oggetto valido in mano per posizionare qui.");
+        }
     }
 
     public void Place(PickupObject item, Vector3 hitPoint)
@@ -50,8 +69,8 @@ public class ObjectReceiver : MonoBehaviour
             return;
         }
 
-        // 🔑 piazza mantenendo scala globale
-        item.transform.SetParent(null, true); // true = mantieni world position/rotation/scale
+        // piazza mantenendo scala globale
+        item.transform.SetParent(null, true);
         item.transform.position = bestPoint.position;
         item.transform.rotation = bestPoint.rotation;
 
@@ -60,14 +79,6 @@ public class ObjectReceiver : MonoBehaviour
         item.currentPlacePoint = bestPoint;
 
         occupied[bestPoint] = item;
-
-        // Cookware
-        var cookware = item.GetComponent<Cookware>();
-        if (cookware != null) cookware.OnPlacedInReceiver();
-
-        // Package
-        var package = item.GetComponent<PackageBox>();
-        if (package != null) package.Place();
 
         // Dish in DeliveryBox
         var dish = item.GetComponent<Dish>();

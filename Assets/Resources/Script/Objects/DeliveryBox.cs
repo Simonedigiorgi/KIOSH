@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using UnityEngine;
 
-public class DeliveryBox : MonoBehaviour
+public class DeliveryBox : MonoBehaviour, IInteractable
 {
     private Dish currentDish;
     public Dish CurrentDish => currentDish;
@@ -45,22 +45,17 @@ public class DeliveryBox : MonoBehaviour
             audioSource = GetComponent<AudioSource>();
     }
 
+    // ---------- IInteractable ----------
+    public void Interact(PlayerInteractor interactor)
+    {
+        ToggleDoor();
+    }
+
     // ========== SPORTELLO ==========
     public void ToggleDoor()
     {
         if (door == null || isDoorAnimating) return;
         StartCoroutine(AnimateDoor(!isDoorOpen));
-    }
-
-    public bool HandleDoorClick(Transform clicked)
-    {
-        if (door == null || clicked == null) return false;
-        if (clicked == door || clicked.IsChildOf(door))
-        {
-            ToggleDoor();
-            return true;
-        }
-        return false;
     }
 
     private IEnumerator AnimateDoor(bool open)
@@ -148,7 +143,6 @@ public class DeliveryBox : MonoBehaviour
         TotalDelivered++;
         NotifyUI();
 
-        // Check completamento goal qui, non nella board
         if (TotalDelivered >= deliveryGoal)
         {
             Debug.Log("[DeliveryBox] Tutte le consegne completate!");

@@ -85,10 +85,18 @@ public class HUDManager : MonoBehaviour
     // ---------- Target ----------
     void UpdateTargetNameFromInteractor()
     {
-        if (interactor != null && interactor.currentTargetName != null)
-            targetNameText.text = interactor.currentTargetName.displayName;
+        if (interactor != null && interactor.currentTarget != null)
+        {
+            var nameComp = interactor.currentTarget.GetComponentInParent<InteractableName>();
+            if (nameComp != null)
+                targetNameText.text = nameComp.displayName;
+            else
+                ClearTargetText();
+        }
         else
+        {
             ClearTargetText();
+        }
     }
 
     void ClearTargetText() => targetNameText.text = "";

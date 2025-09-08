@@ -2,16 +2,14 @@
 
 public enum PickupType
 {
-    Package,
-    Ingredient,
-    Dish
+    Dish // 👈 per ora gestiamo solo i piatti
 }
 
-public class PickupObject : MonoBehaviour
+public class PickupObject : MonoBehaviour, IInteractable
 {
     public bool canBePickedUp = true;
     public bool isHeld = false;
-    public PickupType type = PickupType.Package;
+    public PickupType type = PickupType.Dish;
 
     [HideInInspector] public Transform currentPlacePoint;
 
@@ -21,12 +19,11 @@ public class PickupObject : MonoBehaviour
 
         isHeld = true;
 
-        // Parenting mantenendo world transform → NON tocca lo scale
         transform.SetParent(hand, true);
         transform.localPosition = Vector3.zero;
         transform.localRotation = Quaternion.identity;
 
-        // se questo piatto era dentro una DeliveryBox → liberala
+        // Se il piatto era dentro una DeliveryBox → liberala
         var box = GetComponentInParent<DeliveryBox>();
         var dish = GetComponent<Dish>();
         if (box != null && dish != null && box.CurrentDish == dish)
@@ -34,7 +31,7 @@ public class PickupObject : MonoBehaviour
             box.OnDishRemoved(dish);
         }
 
-        // se era in un PlacePoint → liberiamo
+        // Se era in un ObjectReceiver → liberiamo lo slot
         if (currentPlacePoint != null)
         {
             var receiver = currentPlacePoint.GetComponentInParent<ObjectReceiver>();
@@ -50,4 +47,13 @@ public class PickupObject : MonoBehaviour
     }
 
     public virtual bool InteractWith(GameObject target) => false;
+
+    // ---------- IInteractable ----------
+    public void Interact(PlayerInteractor interactor)
+    {
+        if (!isHeld && canBePickedUp)
+        {
+            interactor.PickUp(this);
+        }
+    }
 }

@@ -1,40 +1,23 @@
-﻿using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 public class Dish : MonoBehaviour
 {
     [Header("Dish Settings")]
     public Transform ingredientPivot;
-    public int maxIngredients = 2;
+    public GameObject filledPrefab;
 
-    private int currentCount = 0;
-    private HashSet<string> addedIngredients = new HashSet<string>();
+    private bool isFilled = false;
+    public bool IsComplete => isFilled;
 
-    public bool IsComplete => currentCount >= maxIngredients;
-
-    public bool TryAddCookedIngredient(Ingredient ingredient)
+    public bool TryAddFromStation(CookingStation station)
     {
-        if (IsComplete || ingredient == null || ingredient.dishPrefab == null)
-        {
-            Debug.LogWarning("❌ Piatto pieno o ingrediente non valido");
-            return false;
-        }
+        if (isFilled || station == null) return false;
+        if (!station.CanServeDish()) return false;
 
-        if (addedIngredients.Contains(ingredient.ingredientID))
-        {
-            Debug.LogWarning($"⚠️ L'ingrediente {ingredient.ingredientID} è già nel piatto!");
-            return false;
-        }
+        if (filledPrefab && ingredientPivot)
+            Instantiate(filledPrefab, ingredientPivot.position, ingredientPivot.rotation, ingredientPivot);
 
-        Instantiate(
-            ingredient.dishPrefab,
-            ingredientPivot.position,
-            ingredientPivot.rotation,
-            ingredientPivot
-        );
-
-        addedIngredients.Add(ingredient.ingredientID);
-        currentCount++;
+        isFilled = true;
         return true;
     }
 

@@ -14,7 +14,11 @@ public class PlayerInteractor : MonoBehaviour
     private PickupObject heldPickup;
 
     public GameObject currentTarget { get; private set; }
-    public InteractableName currentTargetName { get; private set; }
+    public IInteractable currentInteractable { get; private set; }
+
+    // 👇 accessor pubblici sicuri
+    public PickupObject HeldPickup => heldPickup;
+    public GameObject HeldObject => heldObject;
 
     private void Awake()
     {
@@ -29,7 +33,7 @@ public class PlayerInteractor : MonoBehaviour
         UpdateRaycastTarget();
 
         if (Input.GetKeyDown(KeyCode.E))
-            HandleInteraction(IsHoldingObject());
+            HandleInteraction();
 
         if (Input.GetKeyDown(KeyCode.Q))
             DropHeld();
@@ -39,7 +43,7 @@ public class PlayerInteractor : MonoBehaviour
     void UpdateRaycastTarget()
     {
         currentTarget = null;
-        currentTargetName = null;
+        currentInteractable = null;
 
         Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
         RaycastHit[] hits = Physics.RaycastAll(ray, interactDistance, ~0);
@@ -49,25 +53,36 @@ public class PlayerInteractor : MonoBehaviour
         {
             GameObject hitObject = hit.collider.gameObject;
 
+            // ignora muri / blocchi
             if (hitObject.layer == LayerMask.NameToLayer("Default"))
-                return; // muro o blocco → interrompi
+                continue;   // <<--- PRIMA era return
 
+            // ignora l’oggetto che stiamo già tenendo in mano
             if (heldObject != null &&
                 (hitObject == heldObject || hitObject.transform.IsChildOf(heldObject.transform)))
                 continue;
 
+            // controlla se appartiene ai layer interagibili
             if ((interactableLayer.value & (1 << hitObject.layer)) == 0)
                 continue;
 
-            currentTarget = hitObject;
-            currentTargetName = hitObject.GetComponent<InteractableName>();
-            return;
+            // se ha un IInteractable valido → è il target
+            var interactable = hitObject.GetComponentInParent<IInteractable>();
+
+            if (interactable != null)
+            {
+                currentTarget = hitObject;
+                currentInteractable = interactable;
+                return;
+            }
         }
     }
 
+
     // ---------- CORE ----------
-    void HandleInteraction(bool isHolding)
+    void HandleInteraction()
     {
+        // Caso speciale: sei già nello spioncino
         var door = FindObjectOfType<RoomDoor>();
         if (door != null && door.IsLookingThroughPeephole)
         {
@@ -75,167 +90,13 @@ public class PlayerInteractor : MonoBehaviour
             return;
         }
 
-        if (!currentTarget)
+        if (!currentTarget || currentInteractable == null)
         {
             Debug.Log("❌ Nessun target valido nel mirino.");
             return;
         }
 
-        if (TryBoard()) return;
-        if (TryDeliveryDoor()) return;
-        if (TryRoomDoor()) return;
-        if (!isHolding && TryDishDispenser()) return;
-        if (!isHolding && TryPackageBox()) return;
-        if (isHolding && TryPickupSpecialized()) return;
-        if (isHolding && TryDishWithCookware()) return;
-        if (isHolding && TryCookIngredient()) return;
-        if (isHolding && TryObjectReceiver()) return;
-        if (!isHolding && TryPickup()) return;
-        if (TryBed()) return; // 👈 aggiunto qui
-
-        Debug.Log("⚠️ Nessuna azione disponibile per questo target.");
-    }
-
-    // ---------- DOOR ----------
-    bool TryRoomDoor()
-    {
-        var door = currentTarget.GetComponentInParent<RoomDoor>();
-        if (door == null) return false;
-
-        // ✅ Lasciamo solo il peephole
-        if (door.peephole != null && currentTarget.transform == door.peephole)
-        {
-            door.InteractWithPeephole();
-            return true;
-        }
-
-        return false;
-    }
-
-    // ---------- ACTIONS ----------
-    bool TryBoard()
-    {
-        var bulletin = currentTarget.GetComponentInParent<BulletinInteraction>();
-        if (bulletin)
-        {
-            bulletin.EnterInteraction();
-            return true;
-        }
-        return false;
-    }
-
-    bool TryDeliveryDoor()
-    {
-        var box = currentTarget.GetComponentInParent<DeliveryBox>();
-        return box != null && box.HandleDoorClick(currentTarget.transform);
-    }
-
-    bool TryDishDispenser()
-    {
-        var dispenser = currentTarget.GetComponentInParent<DishDispenser>();
-        if (dispenser)
-        {
-            dispenser.TryGiveDishToPlayer(this);
-            return true;
-        }
-        return false;
-    }
-
-    bool TryPackageBox()
-    {
-        var box = currentTarget.GetComponentInParent<PackageBox>();
-        if (box && box.isPlaced)
-        {
-            box.TryDeliver(this);
-            return true;
-        }
-        return false;
-    }
-
-    bool TryPickupSpecialized()
-    {
-        return heldPickup != null && heldPickup.InteractWith(currentTarget);
-    }
-
-    bool TryDishWithCookware()
-    {
-        if (heldPickup?.type != PickupType.Dish) return false;
-        var dish = heldPickup.GetComponent<Dish>();
-        var cookware = currentTarget.GetComponentInParent<Cookware>();
-
-        if (dish && cookware && cookware.HasCookedIngredient())
-        {
-            var ingredient = cookware.GetCurrentIngredient();
-            if (ingredient && dish.TryAddCookedIngredient(ingredient))
-            {
-                cookware.ConsumeServing();
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool TryCookIngredient()
-    {
-        if (heldPickup?.type != PickupType.Ingredient) return false;
-        var cookware = currentTarget.GetComponentInParent<Cookware>();
-
-        if (cookware && cookware.TryAddIngredient(heldPickup))
-        {
-            return true;
-        }
-        else
-        {
-            Debug.Log("⚠️ Ingrediente incompatibile con questo strumento.");
-            HUDManager.Instance?.ShowDialog("Non puoi usare questo ingrediente");
-            return true;
-        }
-    }
-
-    bool TryObjectReceiver()
-    {
-        if (heldPickup == null) return false;
-
-        var receiver = currentTarget.GetComponent<ObjectReceiver>();
-        if (receiver != null && receiver.CanAccept(heldPickup))
-        {
-            Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
-            if (Physics.Raycast(ray, out RaycastHit hit, interactDistance, interactableLayer))
-                receiver.Place(heldPickup, hit.point);
-            else
-                receiver.Place(heldPickup, receiver.transform.position);
-
-            ClearHeld();
-            return true;
-        }
-        return false;
-    }
-
-    bool TryPickup()
-    {
-        var pickup = currentTarget.GetComponentInParent<PickupObject>();
-        if (pickup && pickup.canBePickedUp)
-        {
-            var receiver = pickup.GetComponentInParent<ObjectReceiver>();
-            if (receiver != null)
-                receiver.Unplace(pickup);
-
-            PickUp(pickup);
-            return true;
-        }
-        return false;
-    }
-
-    bool TryBed()
-    {
-        var bed = currentTarget.GetComponentInParent<BedInteraction>();
-        if (bed)
-        {
-            var player = FindObjectOfType<PlayerController>();
-            bed.UseBed(player);
-            return true;
-        }
-        return false;
+        currentInteractable.Interact(this);
     }
 
     // ---------- HELD ----------
