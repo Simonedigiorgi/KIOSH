@@ -87,7 +87,7 @@ public class TimerDisplayUI : MonoBehaviour
     {
         StopUiLoop();
         PlayStop();
-        if (label) label.text = failText + "\n00:00:000";
+        if (label) label.text = failText + "\n00:00"; // solo mm:ss
         lockText = true;
         lastRunning = false;
     }
@@ -97,7 +97,6 @@ public class TimerDisplayUI : MonoBehaviour
         var tm = TimerManager.Instance;
         if (!tm || !label) return;
 
-        // header changes; loop will keep refreshing remaining time
         lastHeader = taskCompleteText;
         label.text = taskCompleteText + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
         lockText = false;
@@ -201,6 +200,6 @@ public class TimerDisplayUI : MonoBehaviour
         var tm = TimerManager.Instance;
         return (tm != null)
             ? waitingText + "\n" + TimerManager.FormatTime(tm.defaultDurationSeconds)
-            : waitingText + "\n00:00:000";
+            : waitingText + "\n00:00"; // solo mm:ss
     }
 }

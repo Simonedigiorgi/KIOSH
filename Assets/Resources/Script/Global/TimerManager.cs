@@ -14,7 +14,7 @@ public class TimerManager : MonoBehaviour
     private bool playerInsideRoom = false;
     private bool deliveriesCompleted = false;
 
-    // Cache della porta
+    // Sempre cache-ata via tag "RoomDoor"
     private RoomDoor roomDoor;
 
     private bool dayCompleted = false;
@@ -36,7 +36,11 @@ public class TimerManager : MonoBehaviour
     {
         if (Instance && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+    }
 
+    // 👉 Prendiamo la porta in Start, quando la scena è pronta.
+    void Start()
+    {
         CacheRoomDoor();
     }
 
@@ -66,6 +70,7 @@ public class TimerManager : MonoBehaviour
 
         if (running)
         {
+            EnsureRoomDoor();
             roomDoor?.OpenDoor();
             OnTimerStartedGlobal?.Invoke();
         }
@@ -83,6 +88,7 @@ public class TimerManager : MonoBehaviour
     private void HandleAllDeliveriesCompleted()
     {
         deliveriesCompleted = true;
+        EnsureRoomDoor();
         roomDoor?.OpenDoor();
         OnTaskCompletedGlobal?.Invoke();
     }
@@ -94,24 +100,24 @@ public class TimerManager : MonoBehaviour
 
         if (inside && deliveriesCompleted)
         {
-            var door = FindObjectOfType<RoomDoor>();
-            door?.CloseDoor();
+            EnsureRoomDoor();
+            roomDoor?.CloseDoor();
 
             if (running) running = false;
 
-            dayCompleted = true; // ✅ segna giornata completata
+            dayCompleted = true;
             OnDayCompletedGlobal?.Invoke();
             Debug.Log("[TimerManager] Giorno completato: player rientrato in camera.");
         }
     }
+
     public void ResetToIdle()
     {
         running = false;
         remaining = 0f;
         deliveriesCompleted = false;
-        dayCompleted = false; // reset
+        dayCompleted = false;
     }
-
 
     // ===== Utility =====
     private void CacheRoomDoor()
@@ -119,15 +125,20 @@ public class TimerManager : MonoBehaviour
         var go = GameObject.FindWithTag("RoomDoor");
         roomDoor = go ? go.GetComponent<RoomDoor>() : null;
 
-        if (roomDoor == null)
+        if (!roomDoor)
             Debug.LogWarning("[TimerManager] Nessuna RoomDoor trovata con tag 'RoomDoor'.");
+    }
+
+    private void EnsureRoomDoor()
+    {
+        if (!roomDoor) CacheRoomDoor(); // sempre e solo via tag
     }
 
     public static string FormatTime(float seconds)
     {
-        if (seconds <= 0f) return "00:00:000";
-        int totalMs = Mathf.Max(0, Mathf.FloorToInt(seconds * 1000f));
-        var ts = TimeSpan.FromMilliseconds(totalMs);
-        return string.Format("{0:00}:{1:00}:{2:000}", (int)ts.TotalMinutes, ts.Seconds, ts.Milliseconds);
+        int secs = Mathf.Max(0, Mathf.CeilToInt(seconds));
+        int minutes = secs / 60;
+        int s = secs % 60;
+        return string.Format("{0:00}:{1:00}", minutes, s);
     }
 }
