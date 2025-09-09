@@ -8482,7 +8482,7 @@ PlayableDirector:
   m_Enabled: 1
   serializedVersion: 3
   m_PlayableAsset: {fileID: 11400000, guid: f9a3cc644b997e94793f6bbc3b3730ec, type: 2}
-  m_InitialState: 1
+  m_InitialState: 0
   m_WrapMode: 2
   m_DirectorUpdateMode: 1
   m_InitialTime: 0
@@ -23180,7 +23180,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 1023
 --- !u!114 &1116718201
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -42277,6 +42277,11 @@ MonoBehaviour:
   defaultFadeIn: 10
   defaultFadeOut: 3
   targetVolume: 0.6
+  runDay1Intro: 1
+  day1BlackHoldSeconds: 2
+  day1FadeOutDuration: 1.5
+  day1TimelineLeadBeforeFade: 0.2
+  day1Playable: {fileID: 330585550}
 --- !u!82 &1956944165
 AudioSource:
   m_ObjectHideFlags: 0

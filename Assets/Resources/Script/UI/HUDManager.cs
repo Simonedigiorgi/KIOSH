@@ -119,31 +119,90 @@ public class HUDManager : MonoBehaviour
         isInteracting = value;
     }
 
-    // ---------- Blackout ----------
+    // ---------- Blackout (helper) ----------
+    CanvasGroup GetOrAddBlackoutCanvasGroup()
+    {
+        if (!blackoutPanel) return null;
+        var cg = blackoutPanel.GetComponent<CanvasGroup>();
+        if (!cg) cg = blackoutPanel.AddComponent<CanvasGroup>();
+        return cg;
+    }
+
+    /// <summary>Attiva il pannello blackout (senza toccare l'alpha).</summary>
     public void ShowBlackout()
     {
         if (blackoutPanel)
             blackoutPanel.SetActive(true);
     }
 
+    /// <summary>Disattiva il pannello blackout.</summary>
+    public void HideBlackout()
+    {
+        if (blackoutPanel)
+            blackoutPanel.SetActive(false);
+    }
+
+    /// <summary>Setta immediatamente alpha del blackout (0..1). Attiva il pannello se serve.</summary>
+    public void SetBlackoutAlpha(float a)
+    {
+        if (!blackoutPanel) return;
+        blackoutPanel.SetActive(true);
+        var cg = GetOrAddBlackoutCanvasGroup();
+        if (cg) cg.alpha = Mathf.Clamp01(a);
+    }
+
+    /// <summary>Imposta subito nero pieno (alpha=1) e attiva il pannello.</summary>
+    public void ShowBlackoutImmediateFull()
+    {
+        SetBlackoutAlpha(1f);
+    }
+
+    /// <summary>Fade IN: da 0 a 1 in duration secondi (lascia attivo e nero).</summary>
     public IEnumerator FadeBlackout(float duration)
     {
         if (!blackoutPanel) yield break;
 
         blackoutPanel.SetActive(true);
+        var canvasGroup = GetOrAddBlackoutCanvasGroup();
 
-        var canvasGroup = blackoutPanel.GetComponent<CanvasGroup>();
-        if (!canvasGroup) canvasGroup = blackoutPanel.AddComponent<CanvasGroup>();
+        float from = 0f;
+        float to = 1f;
 
-        canvasGroup.alpha = 0f;
+        canvasGroup.alpha = from;
         float t = 0f;
         while (t < duration)
         {
             t += Time.deltaTime;
-            canvasGroup.alpha = Mathf.Clamp01(t / duration);
+            float k = Mathf.Clamp01(t / duration);
+            canvasGroup.alpha = Mathf.Lerp(from, to, k);
             yield return null;
         }
-        canvasGroup.alpha = 1f;
+        canvasGroup.alpha = to;
+    }
+
+    /// <summary>Fade OUT: da 1 a 0 in duration secondi (alla fine lascia attivo ma trasparente).</summary>
+    public IEnumerator FadeBlackoutOut(float duration)
+    {
+        if (!blackoutPanel) yield break;
+
+        blackoutPanel.SetActive(true);
+        var canvasGroup = GetOrAddBlackoutCanvasGroup();
+
+        float from = 1f;
+        float to = 0f;
+
+        canvasGroup.alpha = from;
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.Clamp01(t / duration);
+            canvasGroup.alpha = Mathf.Lerp(from, to, k);
+            yield return null;
+        }
+        canvasGroup.alpha = to;
+        // Se preferisci spegnerlo del tutto alla fine, decommenta:
+        // blackoutPanel.SetActive(false);
     }
 
     // ---------- Dialoghi ----------

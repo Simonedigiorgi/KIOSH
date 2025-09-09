@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Playables; // <-- PlayableDirector
 #if ODIN_INSPECTOR
 using Sirenix.OdinInspector;
 #endif
@@ -65,6 +66,8 @@ public class GameStateManager : MonoBehaviour
 {
     public static GameStateManager Instance { get; private set; }
 
+    private PlayerController cachedPlayerController; // cache opzionale
+
     [Header("Config iniziale")]
     [Tooltip("Indice 0..6 (0 = Giorno 1, 6 = Giorno 7)")]
     [SerializeField] private int startDayIndex = 0;                 // 0..6
@@ -101,6 +104,42 @@ public class GameStateManager : MonoBehaviour
 #endif
     [SerializeField] private float targetVolume = 1f;
 
+    // ---------- Giorno 1: Intro ----------
+#if ODIN_INSPECTOR
+    [FoldoutGroup("Day 1 Intro"), LabelWidth(150)]
+    [LabelText("Abilita Intro Giorno 1")]
+#endif
+    [SerializeField] private bool runDay1Intro = true;
+
+#if ODIN_INSPECTOR
+    [FoldoutGroup("Day 1 Intro"), LabelWidth(150)]
+    [LabelText("Hold Nero (sec)")]
+#endif
+    [SerializeField] private float day1BlackHoldSeconds = 2f;
+
+#if ODIN_INSPECTOR
+    [FoldoutGroup("Day 1 Intro"), LabelWidth(150)]
+    [LabelText("Fade Out (sec)")]
+#endif
+    [SerializeField] private float day1FadeOutDuration = 1.5f;
+
+#if ODIN_INSPECTOR
+    [FoldoutGroup("Day 1 Intro"), LabelWidth(150)]
+    [LabelText("Anticipo Timeline (sec)")]
+    [PropertyRange(0f, 5f)]
+#else
+    [Range(0f, 5f)]
+#endif
+    [SerializeField] private float day1TimelineLeadBeforeFade = 0.2f;
+
+#if ODIN_INSPECTOR
+    [FoldoutGroup("Day 1 Intro"), LabelWidth(150)]
+    [LabelText("Playable Director")]
+#endif
+    public PlayableDirector day1Playable;
+
+    private bool didRunDay1Intro = false;
+
     // Stato pubblico
     public int CurrentDayIndex { get; private set; } = 0;           // 0..6
     public int CurrentDay => CurrentDayIndex + 1;                    // 1..7 (per UI)
@@ -124,8 +163,6 @@ public class GameStateManager : MonoBehaviour
         EnsureSevenDays();
 
         audioSource = GetComponent<AudioSource>();
-        // Non leggiamo più qui un "target volume" dall'AudioSource:
-        // i fade useranno sempre 'targetVolume' impostato dall'Inspector.
         // (Opzionale) Se vuoi allineare l'AudioSource al target all'avvio:
         // audioSource.volume = Mathf.Clamp01(targetVolume);
     }
@@ -247,6 +284,16 @@ public class GameStateManager : MonoBehaviour
             var panels = FindObjectsByType<BulletinController>(FindObjectsSortMode.None);
             for (int i = 0; i < panels.Length; i++) panels[i]?.RefreshNow();
         }
+
+        // 6) Intro solo nel Morning del Giorno 1 (una sola volta)
+        if (!didRunDay1Intro
+            && runDay1Intro
+            && CurrentDayIndex == 0
+            && CurrentPhase == DayPhase.Morning)
+        {
+            didRunDay1Intro = true;
+            StartCoroutine(Day1IntroRoutine());
+        }
     }
 
     private void ApplyToggles(List<ToggleEvent> list)
@@ -354,5 +401,69 @@ public class GameStateManager : MonoBehaviour
             yield return null;
         }
         audioSource.volume = to;
+    }
+
+    // ---------- Giorno 1: nero → (lead) cutscene → fade-out ----------
+    // ---------- Giorno 1: nero subito → (lead) cutscene → fade-out ----------
+    private System.Collections.IEnumerator Day1IntroRoutine()
+    {
+        var hud = HUDManager.Instance ? HUDManager.Instance : FindObjectOfType<HUDManager>();
+        if (!hud || !hud.blackoutPanel)
+            yield break;
+
+        // 0) Blocca SUBITO i controlli del player
+        if (!cachedPlayerController) cachedPlayerController = FindObjectOfType<PlayerController>();
+        if (cachedPlayerController) cachedPlayerController.SetControlsEnabled(false);
+
+        // 1) Nero immediato
+        hud.ShowBlackoutImmediateFull();
+
+        // Tempi
+        float hold = Mathf.Max(0f, day1BlackHoldSeconds);
+        float lead = Mathf.Clamp(day1TimelineLeadBeforeFade, 0f, hold); // quanto prima del fade-out far partire la Timeline
+        float waitBeforeCutscene = hold - lead;
+
+        // 2) Attendi fino a poco prima dell'inizio del fade-out
+        if (waitBeforeCutscene > 0f)
+            yield return new WaitForSeconds(waitBeforeCutscene);
+
+        // 3) Avvia CUTSCENE prima del fade-out (player già bloccato)
+        if (day1Playable)
+        {
+            day1Playable.stopped -= OnDay1PlayableStopped; // evita doppio subscribe
+            day1Playable.stopped += OnDay1PlayableStopped;
+            day1Playable.Play();
+        }
+
+        // 4) Attendi l'anticipo, poi inizia il fade-out
+        if (lead > 0f)
+            yield return new WaitForSeconds(lead);
+
+        // 5) Fade-out del blackout
+        if (day1FadeOutDuration > 0f)
+            yield return hud.FadeBlackoutOut(day1FadeOutDuration);
+        else
+            hud.SetBlackoutAlpha(0f);
+
+        // 6) Se NON c'è una Timeline, sblocca i controlli adesso
+        if (!day1Playable && cachedPlayerController)
+            cachedPlayerController.SetControlsEnabled(true);
+
+        // (opzionale) spegni proprio il pannello:
+        // hud.HideBlackout();
+    }
+
+
+    // Handler: sblocca il player quando la Timeline termina
+    private void OnDay1PlayableStopped(UnityEngine.Playables.PlayableDirector dir)
+    {
+        if (cachedPlayerController) cachedPlayerController.SetControlsEnabled(true);
+        if (day1Playable) day1Playable.stopped -= OnDay1PlayableStopped; // clean-up
+    }
+
+    // clean-up extra
+    private void OnDisable()
+    {
+        if (day1Playable) day1Playable.stopped -= OnDay1PlayableStopped;
     }
 }
