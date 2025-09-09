@@ -8383,7 +8383,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0.6, z: 0.25}
+  m_LocalPosition: {x: 0, y: 0.6, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -22043,7 +22043,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a2dee7ba51d0964dbe96b123e68e746, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  speed: 2.5
+  speed: 1.5
   mouseSensitivity: 80
   mouseSmoothing: 0.05
   minLookAngle: -80
@@ -42160,7 +42160,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fd08cfc4738c4c24b9b9df61c96abed8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  startDay: 1
+  startDayIndex: 0
   startPhase: 0
   days:
   - hasNight: 1
@@ -42276,6 +42276,7 @@ MonoBehaviour:
           m_CallState: 2
   defaultFadeIn: 10
   defaultFadeOut: 3
+  targetVolume: 0.6
 --- !u!82 &1956944165
 AudioSource:
   m_ObjectHideFlags: 0
@@ -42289,7 +42290,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
-  m_Volume: 0.6
+  m_Volume: 1
   m_Pitch: 1
   Loop: 0
   Mute: 0

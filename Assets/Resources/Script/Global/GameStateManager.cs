@@ -66,7 +66,8 @@ public class GameStateManager : MonoBehaviour
     public static GameStateManager Instance { get; private set; }
 
     [Header("Config iniziale")]
-    [SerializeField] private int startDay = 1;
+    [Tooltip("Indice 0..6 (0 = Giorno 1, 6 = Giorno 7)")]
+    [SerializeField] private int startDayIndex = 0;                 // 0..6
     [SerializeField] private DayPhase startPhase = DayPhase.Morning;
 
     [Header("Campagna di 7 giorni")]
@@ -86,11 +87,23 @@ public class GameStateManager : MonoBehaviour
 #endif
     [SerializeField] private PhaseEventList globalNightAlways = new();
 
-    [Header("Audio (loop con fade)")]
-    [Min(0f)] public float defaultFadeIn = 10.0f;
-    [Min(0f)] public float defaultFadeOut = 10.0f;
+    [Header("Audio (loop con fade, usa settaggi dell'AudioSource)")]
+    public float defaultFadeIn = 10.0f;
+    public float defaultFadeOut = 3.0f;
 
-    public int CurrentDay { get; private set; } = 1;   // 1..7
+#if ODIN_INSPECTOR
+    [LabelText("Target Volume")]
+    [Tooltip("Volume di destinazione per i fade (0..1). Viene preso dall'Inspector e NON dal volume iniziale dell'AudioSource.")]
+    [PropertyRange(0f, 1f)]
+#else
+    [Tooltip("Volume di destinazione per i fade (0..1). Viene preso dall'Inspector e NON dal volume iniziale dell'AudioSource.")]
+    [Range(0f, 1f)]
+#endif
+    [SerializeField] private float targetVolume = 1f;
+
+    // Stato pubblico
+    public int CurrentDayIndex { get; private set; } = 0;           // 0..6
+    public int CurrentDay => CurrentDayIndex + 1;                    // 1..7 (per UI)
     public DayPhase CurrentPhase { get; private set; } = DayPhase.Morning;
     public event Action<int, DayPhase> OnPhaseChanged;
 
@@ -101,7 +114,6 @@ public class GameStateManager : MonoBehaviour
     // ---- Audio ----
     private AudioSource audioSource;     // via GetComponent (non in Inspector)
     private Coroutine audioRoutine;
-    private float baseVolume = 1f;
 
     void Awake()
     {
@@ -112,12 +124,10 @@ public class GameStateManager : MonoBehaviour
         EnsureSevenDays();
 
         audioSource = GetComponent<AudioSource>();
-        if (audioSource)
-        {
-            baseVolume = audioSource.volume;
-            audioSource.playOnAwake = false;
-            audioSource.loop = false; // lo gestiamo noi
-        }
+        // Non leggiamo più qui un "target volume" dall'AudioSource:
+        // i fade useranno sempre 'targetVolume' impostato dall'Inspector.
+        // (Opzionale) Se vuoi allineare l'AudioSource al target all'avvio:
+        // audioSource.volume = Mathf.Clamp01(targetVolume);
     }
 
 #if UNITY_EDITOR
@@ -126,7 +136,7 @@ public class GameStateManager : MonoBehaviour
 
     void Start()
     {
-        CurrentDay = Mathf.Clamp(startDay, 1, 7);
+        CurrentDayIndex = Mathf.Clamp(startDayIndex, 0, 6);
         CurrentPhase = startPhase;
 
         BuildBaseline();
@@ -169,16 +179,20 @@ public class GameStateManager : MonoBehaviour
 
     public void AdvancePhase()
     {
-        var cfg = days[Mathf.Clamp(CurrentDay - 1, 0, days.Count - 1)];
+        var cfg = days[Mathf.Clamp(CurrentDayIndex, 0, days.Count - 1)];
 
         if (CurrentPhase == DayPhase.Morning)
         {
             if (cfg.hasNight) CurrentPhase = DayPhase.Night;
-            else { CurrentDay = Mathf.Min(CurrentDay + 1, 7); CurrentPhase = DayPhase.Morning; }
+            else
+            {
+                CurrentDayIndex = Mathf.Min(CurrentDayIndex + 1, 6);
+                CurrentPhase = DayPhase.Morning;
+            }
         }
         else
         {
-            CurrentDay = Mathf.Min(CurrentDay + 1, 7);
+            CurrentDayIndex = Mathf.Min(CurrentDayIndex + 1, 6);
             CurrentPhase = DayPhase.Morning;
         }
 
@@ -212,12 +226,12 @@ public class GameStateManager : MonoBehaviour
             ForceDeactivate(globalMorningAlways.toggles);
         }
 
-        // 2) eventi del giorno
-        var cfg = days[Mathf.Clamp(CurrentDay - 1, 0, days.Count - 1)];
+        // 2) eventi del giorno corrente
+        var cfg = days[Mathf.Clamp(CurrentDayIndex, 0, days.Count - 1)];
         var list = (CurrentPhase == DayPhase.Morning) ? cfg.morning : cfg.night;
 
         ApplyToggles(list.toggles);
-        list.actions?.Invoke(); // azioni della fase del giorno
+        list.actions?.Invoke();
 
         // 3) ri-applica override persistenti
         foreach (var kv in persisted)
@@ -266,17 +280,19 @@ public class GameStateManager : MonoBehaviour
         if (go && go.activeSelf != active) go.SetActive(active);
     }
 
-    // ---------- AUDIO: LOOP + FADE ----------
+    // ---------- AUDIO: LOOP + FADE (rispetta i settaggi dell'AudioSource) ----------
 
     public void StartLoop(AudioClip clip)
     {
         if (!audioSource || clip == null) return;
 
-        // stessa clip → porta solo il volume al base (fade-in), senza restart
+        float target = Mathf.Clamp01(targetVolume); // usa il valore dall’Inspector
+
+        // stessa clip → porta solo il volume al target, senza restart
         if (audioSource.isPlaying && audioSource.clip == clip)
         {
             if (audioRoutine != null) StopCoroutine(audioRoutine);
-            audioRoutine = StartCoroutine(FadeVolume(audioSource.volume, Mathf.Clamp01(baseVolume), defaultFadeIn));
+            audioRoutine = StartCoroutine(FadeVolume(audioSource.volume, target, defaultFadeIn));
             return;
         }
 
@@ -294,14 +310,17 @@ public class GameStateManager : MonoBehaviour
 
     private System.Collections.IEnumerator FadeToClip(AudioClip newClip, float fadeIn)
     {
-        float targetVol = Mathf.Clamp01(baseVolume);
+        float targetVol = Mathf.Clamp01(targetVolume); // usa il valore dall’Inspector
 
-        audioSource.loop = true;
+        // NON tocchiamo loop: usiamo quello configurato da te
         audioSource.clip = newClip;
-        audioSource.volume = 0f;   // start a zero
+
+        // per il fade-in abbassiamo a 0 in modo temporaneo
+        float restoreAfter = targetVol;
+        audioSource.volume = 0f;
         audioSource.Play();
 
-        yield return FadeVolume(0f, targetVol, fadeIn);
+        yield return FadeVolume(0f, restoreAfter, fadeIn);
         audioRoutine = null;
     }
 
