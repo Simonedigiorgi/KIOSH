@@ -1,68 +1,107 @@
-﻿using UnityEngine;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Events;
+#if ODIN_INSPECTOR
+using Sirenix.OdinInspector;
+#endif
 
 public enum DayPhase { Morning, Night }
 
+// ----------------- DATA -----------------
+
 [Serializable]
-public class PhaseObject
+public class ToggleEvent
 {
-    public GameObject obj;
-    [Tooltip("Se true, lo stato impostato viene memorizzato e rimane anche nelle fasi/giorni successivi finché non sovrascritto.")]
-    public bool persist = false;
+    [Tooltip("Oggetto da attivare/disattivare quando l'evento si applica")]
+    public GameObject target;
+
+    [Tooltip("Stato desiderato quando l'evento si applica")]
+    public bool setActive = true;
+
+    [Tooltip("Se true, lo stato resta memorizzato e verrà riapplicato anche in fasi/giorni successivi finché non sovrascritto.")]
+    public bool persistent = false;
 }
 
 [Serializable]
-public class PhaseSet
+public class PhaseEventList
 {
-    public List<PhaseObject> enable = new List<PhaseObject>();
-    public List<PhaseObject> disable = new List<PhaseObject>();
+#if ODIN_INSPECTOR
+    [BoxGroup("Events", ShowLabel = true)]
+    [LabelText("Toggles")]
+    [ListDrawerSettings(Expanded = true, DraggableItems = true)]
+#endif
+    public List<ToggleEvent> toggles = new();
+
+#if ODIN_INSPECTOR
+    [BoxGroup("Events")]
+    [LabelText("Actions (UnityEvents)")]
+#endif
+    public UnityEvent actions;   // azioni “on enter phase” (indipendenti dai toggle)
 }
 
 [Serializable]
 public class DayConfig
 {
-    [Tooltip("Se true, questo giorno ha anche la fase Notte.")]
+    [Tooltip("Questo giorno ha anche la fase Notte?")]
     public bool hasNight = true;
 
-    [Header("Morning")]
-    public PhaseSet morning = new PhaseSet();
+#if ODIN_INSPECTOR
+    [FoldoutGroup("Morning"), LabelWidth(90)]
+#endif
+    public PhaseEventList morning = new();
 
-    [Header("Night")]
-    public PhaseSet night = new PhaseSet();
+#if ODIN_INSPECTOR
+    [FoldoutGroup("Night"), LabelWidth(90)]
+#endif
+    public PhaseEventList night = new();
 }
 
+// ----------------- MANAGER -----------------
+
+[DisallowMultipleComponent]
+[RequireComponent(typeof(AudioSource))]
 public class GameStateManager : MonoBehaviour
 {
     public static GameStateManager Instance { get; private set; }
-
-    [Header("Stato corrente (runtime)")]
-    public int CurrentDay { get; private set; } = 1;
-    public DayPhase CurrentPhase { get; private set; } = DayPhase.Morning;
 
     [Header("Config iniziale")]
     [SerializeField] private int startDay = 1;
     [SerializeField] private DayPhase startPhase = DayPhase.Morning;
 
     [Header("Campagna di 7 giorni")]
-    [SerializeField] private DayConfig[] days = new DayConfig[7];
-    public const int MaxDays = 7;
+#if ODIN_INSPECTOR
+    [ListDrawerSettings(Expanded = true, DraggableItems = false, ShowIndexLabels = true)]
+#endif
+    [SerializeField] private List<DayConfig> days = new(7);
 
-    [Header("Eventi GLOBALI sempre attivi")]
-    [Tooltip("Applicati ogni mattina, prima degli eventi del giorno.")]
-    public PhaseSet globalMorningAlways = new PhaseSet();
-    [Tooltip("Applicati ogni notte, prima degli eventi del giorno.")]
-    public PhaseSet globalNightAlways = new PhaseSet();
+    [Header("Eventi GLOBALI sempre attivi (mutuamente esclusivi)")]
+#if ODIN_INSPECTOR
+    [FoldoutGroup("Global Morning Always"), LabelWidth(140)]
+#endif
+    [SerializeField] private PhaseEventList globalMorningAlways = new();
 
+#if ODIN_INSPECTOR
+    [FoldoutGroup("Global Night Always"), LabelWidth(140)]
+#endif
+    [SerializeField] private PhaseEventList globalNightAlways = new();
+
+    [Header("Audio (loop con fade)")]
+    [Min(0f)] public float defaultFadeIn = 10.0f;
+    [Min(0f)] public float defaultFadeOut = 10.0f;
+
+    public int CurrentDay { get; private set; } = 1;   // 1..7
+    public DayPhase CurrentPhase { get; private set; } = DayPhase.Morning;
     public event Action<int, DayPhase> OnPhaseChanged;
 
-    // ---- Persistenza & baseline ----
-    // Stato persistente per oggetto
-    private readonly Dictionary<GameObject, bool> _persistentOverride = new Dictionary<GameObject, bool>();
-    // Stato iniziale (snapshot) per oggetto
-    private readonly Dictionary<GameObject, bool> _initialActive = new Dictionary<GameObject, bool>();
-    // Oggetti toccati non-persistentemente nella fase precedente
-    private readonly HashSet<GameObject> _lastNonPersistentTouched = new HashSet<GameObject>();
+    // ---- Stato oggetti ----
+    private readonly Dictionary<GameObject, bool> baseline = new();   // activeSelf allo start
+    private readonly Dictionary<GameObject, bool> persisted = new();  // override persistenti
+
+    // ---- Audio ----
+    private AudioSource audioSource;     // via GetComponent (non in Inspector)
+    private Coroutine audioRoutine;
+    private float baseVolume = 1f;
 
     void Awake()
     {
@@ -70,232 +109,231 @@ public class GameStateManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        EnsureDaysArray();
-        startDay = Mathf.Clamp(startDay, 1, MaxDays);
+        EnsureSevenDays();
+
+        audioSource = GetComponent<AudioSource>();
+        if (audioSource)
+        {
+            baseVolume = audioSource.volume;
+            audioSource.playOnAwake = false;
+            audioSource.loop = false; // lo gestiamo noi
+        }
     }
+
+#if UNITY_EDITOR
+    void OnValidate() => EnsureSevenDays();
+#endif
 
     void Start()
     {
-        CurrentDay = startDay;
+        CurrentDay = Mathf.Clamp(startDay, 1, 7);
         CurrentPhase = startPhase;
-        Debug.Log($"[GameStateManager] Avvio: Giorno {CurrentDay}, {CurrentPhase}");
-        TriggerPhaseEvents();
+
+        BuildBaseline();
+        ApplyPhase();
     }
 
-    // =========================================================
-    // Avanzamento fasi
-    // =========================================================
+    // ---------- Campagna ----------
+
+    private void EnsureSevenDays()
+    {
+        if (days == null) days = new List<DayConfig>(7);
+        while (days.Count < 7) days.Add(new DayConfig());
+        while (days.Count > 7) days.RemoveAt(days.Count - 1);
+    }
+
+    private void BuildBaseline()
+    {
+        baseline.Clear();
+
+        void Acc(PhaseEventList list)
+        {
+            if (list == null || list.toggles == null) return;
+            for (int i = 0; i < list.toggles.Count; i++)
+            {
+                var t = list.toggles[i];
+                if (!t?.target) continue;
+                if (!baseline.ContainsKey(t.target))
+                    baseline[t.target] = t.target.activeSelf;
+            }
+        }
+
+        Acc(globalMorningAlways);
+        Acc(globalNightAlways);
+        for (int i = 0; i < days.Count; i++)
+        {
+            Acc(days[i].morning);
+            Acc(days[i].night);
+        }
+    }
+
     public void AdvancePhase()
     {
-        Debug.Log($"[GameStateManager] AdvancePhase (giorno {CurrentDay}, fase {CurrentPhase})");
+        var cfg = days[Mathf.Clamp(CurrentDay - 1, 0, days.Count - 1)];
 
         if (CurrentPhase == DayPhase.Morning)
         {
-            var cfg = GetDayConfig(CurrentDay);
-            if (cfg != null && cfg.hasNight)
-            {
-                CurrentPhase = DayPhase.Night;
-                Debug.Log($"🌙 Giorno {CurrentDay} → Notte");
-            }
-            else
-            {
-                CurrentDay = Mathf.Min(CurrentDay + 1, MaxDays);
-                CurrentPhase = DayPhase.Morning;
-                Debug.Log($"🌞 Giorno {CurrentDay} → Mattina");
-            }
+            if (cfg.hasNight) CurrentPhase = DayPhase.Night;
+            else { CurrentDay = Mathf.Min(CurrentDay + 1, 7); CurrentPhase = DayPhase.Morning; }
         }
-        else // Night
+        else
         {
-            CurrentDay = Mathf.Min(CurrentDay + 1, MaxDays);
+            CurrentDay = Mathf.Min(CurrentDay + 1, 7);
             CurrentPhase = DayPhase.Morning;
-            Debug.Log($"🌞 Giorno {CurrentDay} → Mattina (dopo la notte)");
         }
 
-        TriggerPhaseEvents();
+        ApplyPhase();
     }
 
-    // =========================================================
-    // Applicazione eventi + persistenza + baseline corretto
-    // =========================================================
-    private void TriggerPhaseEvents()
+    private void ApplyPhase()
     {
-        Debug.Log($"[GameStateManager] Trigger: Giorno {CurrentDay}, {CurrentPhase}");
-
-        // 0) Ripristina gli oggetti toccati non-persist nella fase precedente al baseline corretto
-        RestoreNonPersistentToBaseline();
-
-        // 1) Applica gli override persistenti (baseline “memorizzato”)
-        ApplyPersistentOverridesCleanupNulls();
-
-        // 2) Applica GLOBALI della fase corrente (prima non-persist, poi persist)
-        var globalSet = (CurrentPhase == DayPhase.Morning) ? globalMorningAlways : globalNightAlways;
-        ApplyPhaseSet(globalSet, persistOnly: false); // non-persist
-        ApplyPhaseSet(globalSet, persistOnly: true);  // persist
-
-        // 3) Applica EVENTI DEL GIORNO (prima non-persist, poi persist)
-        var cfg = GetDayConfig(CurrentDay);
-        if (cfg != null)
+        // 0) baseline per chi NON è persistente
+        foreach (var kv in baseline)
         {
-            var set = (CurrentPhase == DayPhase.Morning) ? cfg.morning : cfg.night;
-            ApplyPhaseSet(set, persistOnly: false); // non-persist
-            ApplyPhaseSet(set, persistOnly: true);  // persist
+            var go = kv.Key;
+            if (!go) continue;
+            if (persisted.ContainsKey(go)) continue;
+            SafeSetActive(go, kv.Value);
         }
 
-        // 4) Notifica UI/Adapter
+        // 1) globali esclusivi
+        if (CurrentPhase == DayPhase.Morning)
+        {
+            ApplyToggles(globalMorningAlways.toggles);
+            globalMorningAlways.actions?.Invoke();
+
+            ForceDeactivate(globalNightAlways.toggles);
+        }
+        else
+        {
+            ApplyToggles(globalNightAlways.toggles);
+            globalNightAlways.actions?.Invoke();
+
+            ForceDeactivate(globalMorningAlways.toggles);
+        }
+
+        // 2) eventi del giorno
+        var cfg = days[Mathf.Clamp(CurrentDay - 1, 0, days.Count - 1)];
+        var list = (CurrentPhase == DayPhase.Morning) ? cfg.morning : cfg.night;
+
+        ApplyToggles(list.toggles);
+        list.actions?.Invoke(); // azioni della fase del giorno
+
+        // 3) ri-applica override persistenti
+        foreach (var kv in persisted)
+            SafeSetActive(kv.Key, kv.Value);
+
+        // 4) notifica
         OnPhaseChanged?.Invoke(CurrentDay, CurrentPhase);
 
-        // 5) Logica globale del mattino
+        // 5) logica mattino centralizzata
         if (CurrentPhase == DayPhase.Morning)
         {
             TimerManager.Instance?.ResetToIdle();
-
             var panels = FindObjectsByType<BulletinController>(FindObjectsSortMode.None);
-            for (int i = 0; i < panels.Length; i++)
-                panels[i]?.RefreshNow();
+            for (int i = 0; i < panels.Length; i++) panels[i]?.RefreshNow();
         }
     }
 
-    private void ApplyPhaseSet(PhaseSet set, bool persistOnly)
+    private void ApplyToggles(List<ToggleEvent> list)
     {
-        if (set == null) return;
+        if (list == null) return;
 
-        // ENABLE
-        if (set.enable != null)
+        for (int i = 0; i < list.Count; i++)
         {
-            for (int i = 0; i < set.enable.Count; i++)
-            {
-                var p = set.enable[i];
-                if (p == null || p.obj == null) continue;
-                if (p.persist != persistOnly) continue;
+            var e = list[i];
+            if (e == null || !e.target) continue;
 
-                CaptureInitialIfNeeded(p.obj);
-                SafeSetActive(p.obj, true);
-
-                if (p.persist)
-                    _persistentOverride[p.obj] = true;
-                else
-                    _lastNonPersistentTouched.Add(p.obj);
-            }
-        }
-
-        // DISABLE
-        if (set.disable != null)
-        {
-            for (int i = 0; i < set.disable.Count; i++)
-            {
-                var p = set.disable[i];
-                if (p == null || p.obj == null) continue;
-                if (p.persist != persistOnly) continue;
-
-                CaptureInitialIfNeeded(p.obj);
-                SafeSetActive(p.obj, false);
-
-                if (p.persist)
-                    _persistentOverride[p.obj] = false;
-                else
-                    _lastNonPersistentTouched.Add(p.obj);
-            }
+            SafeSetActive(e.target, e.setActive);
+            if (e.persistent)
+                persisted[e.target] = e.setActive;
         }
     }
 
-    // Ripristina tutti gli oggetti toccati NON-persist nella fase precedente
-    // al baseline: override persistente se esiste, altrimenti stato iniziale.
-    private void RestoreNonPersistentToBaseline()
+    private void ForceDeactivate(List<ToggleEvent> list)
     {
-        if (_lastNonPersistentTouched.Count == 0) return;
-
-        foreach (var go in _lastNonPersistentTouched)
+        if (list == null) return;
+        for (int i = 0; i < list.Count; i++)
         {
-            if (!go) continue;
-
-            bool baseline;
-            if (_persistentOverride.TryGetValue(go, out var persisted))
-            {
-                baseline = persisted;
-            }
-            else if (_initialActive.TryGetValue(go, out var initActive))
-            {
-                baseline = initActive;
-            }
-            else
-            {
-                // se non conosciamo lo stato iniziale, catturalo ora
-                _initialActive[go] = go.activeSelf;
-                baseline = go.activeSelf;
-            }
-
-            SafeSetActive(go, baseline);
+            var e = list[i];
+            if (!e?.target) continue;
+            SafeSetActive(e.target, false);
         }
-
-        _lastNonPersistentTouched.Clear();
-    }
-
-    private void ApplyPersistentOverridesCleanupNulls()
-    {
-        if (_persistentOverride.Count == 0) return;
-
-        var toRemove = ListPool<GameObject>.Get();
-        foreach (var kvp in _persistentOverride)
-        {
-            var go = kvp.Key;
-            if (go == null) { toRemove.Add(go); continue; }
-            SafeSetActive(go, kvp.Value);
-        }
-        for (int i = 0; i < toRemove.Count; i++)
-            _persistentOverride.Remove(toRemove[i]);
-        ListPool<GameObject>.Release(toRemove);
-    }
-
-    private void CaptureInitialIfNeeded(GameObject go)
-    {
-        if (!go) return;
-        if (!_initialActive.ContainsKey(go))
-            _initialActive[go] = go.activeSelf;
     }
 
     private static void SafeSetActive(GameObject go, bool active)
     {
-        if (!go) return;
-        if (go.activeSelf != active) go.SetActive(active);
+        if (go && go.activeSelf != active) go.SetActive(active);
     }
 
-    // =========================================================
-    // Helpers
-    // =========================================================
-    private void EnsureDaysArray()
+    // ---------- AUDIO: LOOP + FADE ----------
+
+    public void StartLoop(AudioClip clip)
     {
-        if (days == null || days.Length != MaxDays)
+        if (!audioSource || clip == null) return;
+
+        // stessa clip → porta solo il volume al base (fade-in), senza restart
+        if (audioSource.isPlaying && audioSource.clip == clip)
         {
-            var old = days;
-            days = new DayConfig[MaxDays];
-            for (int i = 0; i < MaxDays; i++)
-                days[i] = (old != null && i < old.Length && old[i] != null) ? old[i] : new DayConfig();
+            if (audioRoutine != null) StopCoroutine(audioRoutine);
+            audioRoutine = StartCoroutine(FadeVolume(audioSource.volume, Mathf.Clamp01(baseVolume), defaultFadeIn));
+            return;
         }
+
+        if (audioRoutine != null) StopCoroutine(audioRoutine);
+        audioRoutine = StartCoroutine(FadeToClip(clip, defaultFadeIn));
     }
 
-    private DayConfig GetDayConfig(int day)
+    public void StopLoop()
     {
-        if (day < 1 || day > MaxDays) return null;
-        return days[day - 1];
+        if (!audioSource) return;
+
+        if (audioRoutine != null) StopCoroutine(audioRoutine);
+        audioRoutine = StartCoroutine(FadeOutAndStop(defaultFadeOut));
     }
 
-    // Reset totale (facoltativo)
-    public void ResetCampaign(int day = 1, DayPhase phase = DayPhase.Morning)
+    private System.Collections.IEnumerator FadeToClip(AudioClip newClip, float fadeIn)
     {
-        _persistentOverride.Clear();
-        _initialActive.Clear();
-        _lastNonPersistentTouched.Clear();
+        float targetVol = Mathf.Clamp01(baseVolume);
 
-        CurrentDay = Mathf.Clamp(day, 1, MaxDays);
-        CurrentPhase = phase;
-        TriggerPhaseEvents();
+        audioSource.loop = true;
+        audioSource.clip = newClip;
+        audioSource.volume = 0f;   // start a zero
+        audioSource.Play();
+
+        yield return FadeVolume(0f, targetVol, fadeIn);
+        audioRoutine = null;
     }
-}
 
-// -------- ListPool utility (evita allocazioni temporanee) ----------
-static class ListPool<T>
-{
-    static readonly Stack<List<T>> pool = new Stack<List<T>>();
-    public static List<T> Get() => pool.Count > 0 ? pool.Pop() : new List<T>();
-    public static void Release(List<T> list) { list.Clear(); pool.Push(list); }
+    private System.Collections.IEnumerator FadeOutAndStop(float fadeOut)
+    {
+        float from = audioSource.volume;
+        yield return FadeVolume(from, 0f, fadeOut);
+        audioSource.Stop();
+        audioRoutine = null;
+    }
+
+    private System.Collections.IEnumerator FadeVolume(float from, float to, float duration)
+    {
+        if (!audioSource) yield break;
+
+        if (duration <= 0f)
+        {
+            audioSource.volume = to;
+            yield break;
+        }
+
+        from = Mathf.Clamp01(from);
+        to = Mathf.Clamp01(to);
+
+        float t = 0f;
+        while (t < duration)
+        {
+            t += Time.unscaledDeltaTime; // indipendente dal timeScale
+            float k = Mathf.Clamp01(t / duration);
+            audioSource.volume = Mathf.Lerp(from, to, k);
+            yield return null;
+        }
+        audioSource.volume = to;
+    }
 }

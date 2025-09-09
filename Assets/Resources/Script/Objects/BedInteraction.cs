@@ -27,7 +27,6 @@ public class BedInteraction : MonoBehaviour, IInteractable
         var tm = TimerManager.Instance;
         var gs = GameStateManager.Instance;
 
-        // Di mattina, per dormire devi aver completato la giornata
         if (gs != null && gs.CurrentPhase == DayPhase.Morning)
         {
             if (tm == null || !tm.DayCompleted)
@@ -47,11 +46,16 @@ public class BedInteraction : MonoBehaviour, IInteractable
     {
         isUsed = true;
 
+        // fade-out audio ambiente
+        GameStateManager.Instance?.StopLoop();
+
+        // Fade to black
         if (HUDManager.Instance != null)
             yield return HUDManager.Instance.StartCoroutine(HUDManager.Instance.FadeBlackout(fadeDuration));
         else
             yield return new WaitForSeconds(fadeDuration);
 
+        // Teletrasporto
         if (player != null && sleepPoint != null)
         {
             var cc = player.GetComponent<CharacterController>();
@@ -64,15 +68,17 @@ public class BedInteraction : MonoBehaviour, IInteractable
             if (cc != null) cc.enabled = true;
         }
 
+        // "Dormi"
         yield return new WaitForSeconds(sleepDuration);
 
+        // Chiudi blackout
         if (HUDManager.Instance?.blackoutPanel != null)
             HUDManager.Instance.blackoutPanel.SetActive(false);
 
-        // ✅ Un solo avanzamento: la logica di passare a Night/Morning è tutta nel GameStateManager
+        // Avanza fase
         GameStateManager.Instance?.AdvancePhase();
 
-        // Timeline di risveglio (qualunque sia la fase risultante)
+        // Timeline risveglio (per il fade-in audio usa un evento Morning con StartLoop)
         wakeUpTimeline?.Play();
 
         if (player != null) player.SetControlsEnabled(true);
