@@ -39478,13 +39478,64 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startDay: 1
   startPhase: 0
-  daysWithNight: 01000000
-  phaseEvents:
-  - day: 1
-    phase: 1
-    objectsToEnable:
-    - {fileID: 1647917097}
-    objectsToDisable: []
+  days:
+  - hasNight: 1
+    morning:
+      enable: []
+      disable: []
+    night:
+      enable:
+      - obj: {fileID: 1647917097}
+        persist: 0
+      disable: []
+  - hasNight: 1
+    morning:
+      enable: []
+      disable: []
+    night:
+      enable: []
+      disable: []
+  - hasNight: 1
+    morning:
+      enable: []
+      disable: []
+    night:
+      enable: []
+      disable: []
+  - hasNight: 1
+    morning:
+      enable: []
+      disable: []
+    night:
+      enable: []
+      disable: []
+  - hasNight: 1
+    morning:
+      enable: []
+      disable: []
+    night:
+      enable: []
+      disable: []
+  - hasNight: 1
+    morning:
+      enable: []
+      disable: []
+    night:
+      enable: []
+      disable: []
+  - hasNight: 1
+    morning:
+      enable: []
+      disable: []
+    night:
+      enable: []
+      disable: []
+  globalMorningAlways:
+    enable: []
+    disable: []
+  globalNightAlways:
+    enable: []
+    disable: []
 --- !u!43 &1963947860
 Mesh:
   m_ObjectHideFlags: 0
@@ -43115,7 +43166,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 782d24ac0e6f88f44b44672b96e8d6d8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  defaultDurationSeconds: 10
+  defaultDurationSeconds: 200
 --- !u!114 &2100339117
 MonoBehaviour:
   m_ObjectHideFlags: 0
