@@ -20281,7 +20281,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   speed: 2.5
-  mouseSensitivity: 500
+  mouseSensitivity: 120
   minLookAngle: -80
   maxLookAngle: 80
   groundMask:
@@ -20347,6 +20347,7 @@ MonoBehaviour:
   interactableLayer:
     serializedVersion: 2
     m_Bits: 8
+  doorTag: RoomDoor
 --- !u!114 &1016186869
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -24895,7 +24896,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2632ff1f13bd78b48a3eb8f9a1f88cf0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ingredientPrefab: {fileID: 2403634875185422350, guid: 59a336f10701b4b46a8a06c3fbc484dd, type: 3}
 --- !u!114 &1284398457
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -39312,7 +39312,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   startDay: 1
   startPhase: 0
-  daysWithNight: 01000000
+  daysWithNight: 02000000
   phaseEvents:
   - day: 1
     phase: 1
@@ -40367,7 +40367,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2632ff1f13bd78b48a3eb8f9a1f88cf0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ingredientPrefab: {fileID: 3833184965399703431, guid: f36f5bb72125edf47b237b0891eec94f, type: 3}
 --- !u!114 &2030380364
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -42734,10 +42733,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   fillCylinder: {fileID: 2132497338}
   fillRenderer: {fileID: 2132497339}
-  fillHeight: 0.24
   fillTime: 3
   cookTime: 5
+  consumeAnimTime: 0.25
   maxServings: 5
+  emptyY: 0.02
+  fullY: 0.24
 --- !u!43 &2096337674
 Mesh:
   m_ObjectHideFlags: 0

@@ -8,6 +8,10 @@ using UnityEngine.UI;
 
 public class BulletinController : MonoBehaviour
 {
+    // Throttle per i rebuild di layout
+    private float _nextLayoutRebuildTime = 0f;
+    private const float LAYOUT_REBUILD_INTERVAL = 0.10f; // 10 fps max per i rebuild
+
     [Header("Root Options (statiche da Inspector)")]
     public List<MenuOption> mainOptions; // <-- SOLO base statiche
 
@@ -102,7 +106,7 @@ public class BulletinController : MonoBehaviour
         if (!audioSource) audioSource = gameObject.AddComponent<AudioSource>();
         if (!listPanel) Debug.LogError("[BulletinController] Assegna ListPanel nel Inspector.");
 
-        // Prendiamo una snapshot delle opzioni statiche impostate da Inspector
+        // Snapshot delle opzioni statiche impostate da Inspector
         baseStaticOptions = (mainOptions != null) ? new List<MenuOption>(mainOptions)
                                                   : new List<MenuOption>();
         // all’avvio mostriamo almeno le statiche
@@ -112,6 +116,16 @@ public class BulletinController : MonoBehaviour
     void OnEnable()
     {
         StartCoroutine(DeferredRefresh());
+
+        // Refresh automatico al cambio fase (mattina/notte)
+        if (GameStateManager.Instance != null)
+            GameStateManager.Instance.OnPhaseChanged += OnPhaseChanged_Global;
+    }
+
+    void OnDisable()
+    {
+        if (GameStateManager.Instance != null)
+            GameStateManager.Instance.OnPhaseChanged -= OnPhaseChanged_Global;
     }
 
     private IEnumerator DeferredRefresh()
@@ -163,8 +177,13 @@ public class BulletinController : MonoBehaviour
                 liveLines[i] = ll;
             }
 
-            if (anyChanged && listPanel)
-                LayoutRebuilder.ForceRebuildLayoutImmediate(listPanel.GetComponent<RectTransform>());
+            // 🔧 Throttle del rebuild layout (riduce stutter)
+            if (anyChanged && listPanel && Time.unscaledTime >= _nextLayoutRebuildTime)
+            {
+                var rt = listPanel.GetComponent<RectTransform>();
+                if (rt) LayoutRebuilder.ForceRebuildLayoutImmediate(rt);
+                _nextLayoutRebuildTime = Time.unscaledTime + LAYOUT_REBUILD_INTERVAL;
+            }
         }
 
         // --- Interazione utente solo se attivo ---
@@ -187,7 +206,6 @@ public class BulletinController : MonoBehaviour
             if (Input.GetKeyDown(nextPageKey)) { NextPage(); PlayMove(); }
         }
     }
-
 
     // ===== API =====
     public void EnterInteraction(BulletinInteraction interaction)
@@ -495,5 +513,11 @@ public class BulletinController : MonoBehaviour
     private void PlayConfirm()
     {
         if (audioSource && sfxConfirm) audioSource.PlayOneShot(sfxConfirm);
+    }
+
+    private void OnPhaseChanged_Global(int day, DayPhase phase)
+    {
+        // Ricostruisci l’intero pannello quando cambia fase
+        RefreshNow();
     }
 }

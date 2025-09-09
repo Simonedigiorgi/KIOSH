@@ -14,14 +14,10 @@ public class BedInteraction : MonoBehaviour, IInteractable
 
     private bool isUsed = false;
 
-    // 👉 Implementazione dell’interfaccia
     public void Interact(PlayerInteractor interactor)
     {
         var player = interactor.GetComponent<PlayerController>();
-        if (player != null)
-        {
-            UseBed(player);
-        }
+        if (player != null) UseBed(player);
     }
 
     public string GetInteractionName() => "Dormire";
@@ -31,6 +27,7 @@ public class BedInteraction : MonoBehaviour, IInteractable
         var tm = TimerManager.Instance;
         var gs = GameStateManager.Instance;
 
+        // Di mattina, per dormire devi aver completato la giornata
         if (gs != null && gs.CurrentPhase == DayPhase.Morning)
         {
             if (tm == null || !tm.DayCompleted)
@@ -72,11 +69,13 @@ public class BedInteraction : MonoBehaviour, IInteractable
         if (HUDManager.Instance?.blackoutPanel != null)
             HUDManager.Instance.blackoutPanel.SetActive(false);
 
+        // ✅ Un solo avanzamento: la logica di passare a Night/Morning è tutta nel GameStateManager
         GameStateManager.Instance?.AdvancePhase();
+
+        // Timeline di risveglio (qualunque sia la fase risultante)
         wakeUpTimeline?.Play();
 
         if (player != null) player.SetControlsEnabled(true);
-
         isUsed = false;
     }
 }

@@ -36,6 +36,10 @@ public class TimerDisplayUI : MonoBehaviour
         TimerManager.OnTaskCompletedGlobal += OnTaskCompleted;
         TimerManager.OnDayCompletedGlobal += OnDayCompleted;
 
+        // 👇 ascolta il cambio fase per sbloccare la UI al mattino
+        if (GameStateManager.Instance != null)
+            GameStateManager.Instance.OnPhaseChanged += OnPhaseChanged;
+
         if (label) label.text = GetWaitingLabelText();
     }
 
@@ -45,6 +49,9 @@ public class TimerDisplayUI : MonoBehaviour
         TimerManager.OnTimerCompletedGlobal -= OnTimerCompleted;
         TimerManager.OnTaskCompletedGlobal -= OnTaskCompleted;
         TimerManager.OnDayCompletedGlobal -= OnDayCompleted;
+
+        if (GameStateManager.Instance != null)
+            GameStateManager.Instance.OnPhaseChanged -= OnPhaseChanged;
     }
 
     void Update()
@@ -130,5 +137,19 @@ public class TimerDisplayUI : MonoBehaviour
             return waitingText + "\n" + TimerManager.FormatTime(tm.defaultDurationSeconds);
         else
             return waitingText + "\n00:00:000";
+    }
+
+    private void OnPhaseChanged(int day, DayPhase phase)
+    {
+        if (phase == DayPhase.Morning)
+        {
+            // reset logica timer
+            TimerManager.Instance?.ResetToIdle();
+
+            // reset UI
+            lockText = false;
+            lastDisplayedSecond = -1;
+            if (label) label.text = GetWaitingLabelText();
+        }
     }
 }

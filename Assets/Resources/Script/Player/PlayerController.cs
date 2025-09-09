@@ -7,27 +7,32 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float speed = 5f;
 
     [Header("Mouse Look")]
-    [SerializeField] private float mouseSensitivity = 100f;
+    [SerializeField, Tooltip("1..10 consigliato")] private float mouseSensitivity = 3f;
+    [SerializeField] private float mouseSmoothing = 0.05f;  // 0 = immediato, 0.03..0.08 morbido
     [SerializeField] private float minLookAngle = -80f;
     [SerializeField] private float maxLookAngle = 80f;
 
-    [Header("Gravity")]
-    [SerializeField] private LayerMask groundMask;
-
     [Header("References")]
-    [SerializeField] private Animator animator; // 👈 Aggancia qui l'Animator del Model
+    [SerializeField] private Animator animator;
 
-    private Transform cameraTransform;
+    private Transform cam;
     private CharacterController controller;
 
-    private float xRotation = 0f;
-    private Vector3 velocity;
+    private float xRotation;           // pitch
+    private Vector3 velocity;          // solo Y per gravità
     private bool controlsEnabled = true;
+
+    // smoothing del mouse
+    private Vector2 mouseDeltaCurrent;
+    private Vector2 mouseDeltaVel;
+
+    private static readonly int SpeedHash = Animator.StringToHash("Speed");
+    private const float MOUSE_BASE = 0.02f; // fattore che rende “normale” la scala della sens
 
     void Awake()
     {
         controller = GetComponent<CharacterController>();
-        cameraTransform = Camera.main.transform;
+        cam = Camera.main ? Camera.main.transform : null;
 
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
@@ -37,85 +42,82 @@ public class PlayerController : MonoBehaviour
     {
         if (!controlsEnabled) return;
 
-        HandleMovement();
-        ApplyGravity();
+        HandleLook();
+        HandleMoveAndGravity();
     }
 
-    void LateUpdate()
+    private void HandleLook()
     {
-        if (!controlsEnabled) return;
+        if (!cam) return;
 
-        HandleCameraRotation();
+        // Raw (niente smoothing Unity) → poi ammorbidiamo noi
+        float rawX = Input.GetAxisRaw("Mouse X");
+        float rawY = Input.GetAxisRaw("Mouse Y");
+
+        // Scala “umana”: mouseSensitivity 1..10
+        Vector2 target = new Vector2(rawX, rawY) * mouseSensitivity * MOUSE_BASE;
+
+        // Ammorbidisci picchi
+        mouseDeltaCurrent = Vector2.SmoothDamp(mouseDeltaCurrent, target, ref mouseDeltaVel, mouseSmoothing);
+
+        // Pitch camera (inverti se vuoi)
+        xRotation = Mathf.Clamp(xRotation - mouseDeltaCurrent.y, minLookAngle, maxLookAngle);
+        cam.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+
+        // Yaw player
+        transform.Rotate(Vector3.up * mouseDeltaCurrent.x);
     }
 
-    private void HandleMovement()
+    private void HandleMoveAndGravity()
     {
-        float moveX = Input.GetAxisRaw("Horizontal");
-        float moveZ = Input.GetAxisRaw("Vertical");
+        float ix = Input.GetAxisRaw("Horizontal");
+        float iz = Input.GetAxisRaw("Vertical");
 
-        Vector3 move = (transform.right * moveX + transform.forward * moveZ).normalized;
-        controller.Move(move * speed * Time.deltaTime);
+        Vector3 inputDir = (transform.right * ix + transform.forward * iz);
+        if (inputDir.sqrMagnitude > 1f) inputDir.Normalize();
 
-        // ---- Drive Animator con velocità planare ----
-        if (animator != null)
-        {
-            Vector3 planar = controller.velocity;
-            planar.y = 0f;
-            float planarSpeed = planar.magnitude;
+        Vector3 horizontal = inputDir * speed;
 
-            animator.SetFloat("Speed", planarSpeed, 0.1f, Time.deltaTime); // damping per fluidità
-        }
-    }
-
-    private void HandleCameraRotation()
-    {
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
-
-        xRotation -= mouseY;
-        xRotation = Mathf.Clamp(xRotation, minLookAngle, maxLookAngle);
-
-        cameraTransform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
-        transform.Rotate(Vector3.up * mouseX);
-    }
-
-    private void ApplyGravity()
-    {
+        // Gravità con “stick” al terreno
         if (controller.isGrounded && velocity.y < 0f)
-            velocity.y = -2f; // piccolo offset per restare grounded
+            velocity.y = -2f;
 
         velocity.y += Physics.gravity.y * Time.deltaTime;
-        controller.Move(velocity * Time.deltaTime);
+
+        // Una sola Move
+        Vector3 motion = (horizontal + new Vector3(0f, velocity.y, 0f)) * Time.deltaTime;
+        controller.Move(motion);
+
+        // Animator: velocità planare desiderata
+        if (animator)
+        {
+            float planarSpeed = horizontal.magnitude; // m/s
+            animator.SetFloat(SpeedHash, planarSpeed, 0.1f, Time.deltaTime);
+        }
     }
 
     public void SetControlsEnabled(bool enabled)
     {
         controlsEnabled = enabled;
-        Debug.Log("Controls enabled = " + controlsEnabled);
         if (!enabled)
+        {
             velocity = Vector3.zero;
+            mouseDeltaCurrent = Vector2.zero;
+            mouseDeltaVel = Vector2.zero;
+        }
     }
 
-    /// <summary>
-    /// Allinea lo stato interno (xRotation) con la rotazione attuale della camera.
-    /// Da chiamare dopo una cutscene per evitare salti.
-    /// </summary>
     public void SyncCameraRotation()
     {
-        if (cameraTransform == null) return;
-
-        Vector3 camAngles = cameraTransform.localEulerAngles;
-        xRotation = camAngles.x;
-
-        // Debug per conferma
-        Debug.Log("[PlayerController] SyncCameraRotation → xRotation = " + xRotation);
+        if (!cam) return;
+        float nx = cam.localEulerAngles.x;
+        if (nx > 180f) nx -= 360f;
+        xRotation = Mathf.Clamp(nx, minLookAngle, maxLookAngle);
     }
 
     public void ResetCameraRotation()
     {
-        xRotation = 0f; // resetta il pitch interno
-        if (cameraTransform != null)
-            cameraTransform.localRotation = Quaternion.Euler(0f, 0f, 0f);
+        xRotation = 0f;
+        if (cam) cam.localRotation = Quaternion.Euler(0f, 0f, 0f);
     }
-
 }

@@ -16,13 +16,35 @@ public class PlayerInteractor : MonoBehaviour
     public GameObject currentTarget { get; private set; }
     public IInteractable currentInteractable { get; private set; }
 
-    // 👇 accessor pubblici sicuri
+    // accessor pubblici sicuri
     public PickupObject HeldPickup => heldPickup;
     public GameObject HeldObject => heldObject;
+
+    // Buffer riusabile per raycast
+    private static readonly RaycastHit[] hitsBuffer = new RaycastHit[12];
+
+    // Cache porta per evitare Find ad ogni pressione
+    [SerializeField] private string doorTag = "RoomDoor";
+    private RoomDoor cachedDoor;
 
     private void Awake()
     {
         playerCamera = Camera.main;
+        CacheDoor();
+    }
+
+    private void CacheDoor()
+    {
+        if (cachedDoor) return;
+
+        if (!string.IsNullOrEmpty(doorTag))
+        {
+            var go = GameObject.FindWithTag(doorTag);
+            if (go) cachedDoor = go.GetComponent<RoomDoor>();
+        }
+
+        if (!cachedDoor)
+            cachedDoor = FindObjectOfType<RoomDoor>(); // fallback one-shot
     }
 
     void Update()
@@ -45,48 +67,55 @@ public class PlayerInteractor : MonoBehaviour
         currentTarget = null;
         currentInteractable = null;
 
-        Ray ray = new Ray(playerCamera.transform.position, playerCamera.transform.forward);
-        RaycastHit[] hits = Physics.RaycastAll(ray, interactDistance, ~0);
-        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        var cam = playerCamera;
+        if (!cam) return;
 
-        foreach (var hit in hits)
+        Ray ray = new Ray(cam.transform.position, cam.transform.forward);
+
+        // Raycast filtrato per layer (niente allocazioni)
+        int count = Physics.RaycastNonAlloc(ray, hitsBuffer, interactDistance, interactableLayer, QueryTriggerInteraction.Ignore);
+        float bestDist = float.MaxValue;
+        IInteractable bestInteractable = null;
+        GameObject bestTarget = null;
+
+        for (int i = 0; i < count; i++)
         {
-            GameObject hitObject = hit.collider.gameObject;
+            var h = hitsBuffer[i];
+            var go = h.collider ? h.collider.gameObject : null;
+            if (!go) continue;
 
-            // ignora muri / blocchi
-            if (hitObject.layer == LayerMask.NameToLayer("Default"))
-                continue;   // <<--- PRIMA era return
-
-            // ignora l’oggetto che stiamo già tenendo in mano
-            if (heldObject != null &&
-                (hitObject == heldObject || hitObject.transform.IsChildOf(heldObject.transform)))
+            // ignora oggetto in mano
+            if (heldObject != null && (go == heldObject || go.transform.IsChildOf(heldObject.transform)))
                 continue;
 
-            // controlla se appartiene ai layer interagibili
-            if ((interactableLayer.value & (1 << hitObject.layer)) == 0)
-                continue;
+            // prova a prendere IInteractable rapidamente
+            IInteractable it = go.GetComponent<IInteractable>();
+            if (it == null) it = go.GetComponentInParent<IInteractable>();
+            if (it == null) continue;
 
-            // se ha un IInteractable valido → è il target
-            var interactable = hitObject.GetComponentInParent<IInteractable>();
-
-            if (interactable != null)
+            if (h.distance < bestDist)
             {
-                currentTarget = hitObject;
-                currentInteractable = interactable;
-                return;
+                bestDist = h.distance;
+                bestInteractable = it;
+                bestTarget = go;
             }
         }
-    }
 
+        if (bestInteractable != null)
+        {
+            currentInteractable = bestInteractable;
+            currentTarget = bestTarget;
+        }
+    }
 
     // ---------- CORE ----------
     void HandleInteraction()
     {
-        // Caso speciale: sei già nello spioncino
-        var door = FindObjectOfType<RoomDoor>();
-        if (door != null && door.IsLookingThroughPeephole)
+        // Caso speciale: spioncino
+        if (!cachedDoor) CacheDoor();
+        if (cachedDoor != null && cachedDoor.IsLookingThroughPeephole)
         {
-            door.InteractWithPeephole();
+            cachedDoor.InteractWithPeephole();
             return;
         }
 

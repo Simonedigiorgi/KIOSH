@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿// TimerBulletinAdapter.cs
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 
@@ -19,6 +20,9 @@ public class TimerBulletinAdapter : BulletinAdapterBase
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted += RefreshPanel;
         TimerManager.OnTimerStartedGlobal += RefreshPanel;
         TimerManager.OnTimerCompletedGlobal += RefreshPanel;
+
+        if (GameStateManager.Instance != null)
+            GameStateManager.Instance.OnPhaseChanged += OnPhaseChanged;
     }
 
     void OnDisable()
@@ -26,6 +30,15 @@ public class TimerBulletinAdapter : BulletinAdapterBase
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted -= RefreshPanel;
         TimerManager.OnTimerStartedGlobal -= RefreshPanel;
         TimerManager.OnTimerCompletedGlobal -= RefreshPanel;
+
+        if (GameStateManager.Instance != null)
+            GameStateManager.Instance.OnPhaseChanged -= OnPhaseChanged;
+    }
+
+    private void OnPhaseChanged(int day, DayPhase phase)
+    {
+        // Al cambio fase basta un refresh (il reset lo fa il GameStateManager)
+        RefreshPanel();
     }
 
     private void RefreshPanel() => controller?.RefreshNow();
@@ -36,8 +49,13 @@ public class TimerBulletinAdapter : BulletinAdapterBase
                                          : new List<BulletinController.MenuOption>();
 
         var tm = TimerManager.Instance;
+        var gs = GameStateManager.Instance;
 
-        // Se il timer è attivo, NON aggiungiamo nulla a questo pannello.
+        // ✅ Mostra questo sottomenu SOLO al mattino
+        if (gs == null || gs.CurrentPhase != DayPhase.Morning)
+            return list;
+
+        // Se il timer è attivo, non aggiungiamo nulla
         if (tm != null && tm.IsRunning)
             return list;
 

@@ -1,15 +1,11 @@
-﻿using UnityEngine;
+﻿// GameStateManager.cs
+using UnityEngine;
 using System;
 using System.Collections.Generic;
 
-public enum DayPhase   // ✅ definito una sola volta, visibile a tutto il file
-{
-    Morning,
-    Night
-}
+public enum DayPhase { Morning, Night }
 
-
-[System.Serializable]   // <-- IMPORTANTE
+[System.Serializable]
 public class PhaseEvent
 {
     public int day;
@@ -60,21 +56,18 @@ public class GameStateManager : MonoBehaviour
         {
             if (daysWithNight.Contains(CurrentDay))
             {
-                // Se il giorno prevede una notte → vai a notte
                 CurrentPhase = DayPhase.Night;
                 Debug.Log($"🌙 Giorno {CurrentDay} → Notte");
             }
             else
             {
-                // Se non prevede notte → passa direttamente al giorno successivo
                 CurrentDay++;
                 CurrentPhase = DayPhase.Morning;
                 Debug.Log($"🌞 Giorno {CurrentDay} → Mattina");
             }
         }
-        else if (CurrentPhase == DayPhase.Night)
+        else // Night
         {
-            // ✅ Dopo qualsiasi notte → vai SEMPRE al giorno successivo
             CurrentDay++;
             CurrentPhase = DayPhase.Morning;
             Debug.Log($"🌞 Giorno {CurrentDay} → Mattina (dopo la notte)");
@@ -91,21 +84,29 @@ public class GameStateManager : MonoBehaviour
         {
             if (ev.day == CurrentDay && ev.phase == CurrentPhase)
             {
-                foreach (var obj in ev.objectsToEnable)
-                    if (obj) obj.SetActive(true);
-
-                foreach (var obj in ev.objectsToDisable)
-                    if (obj) obj.SetActive(false);
-
+                foreach (var obj in ev.objectsToEnable) if (obj) obj.SetActive(true);
+                foreach (var obj in ev.objectsToDisable) if (obj) obj.SetActive(false);
                 Debug.Log($"[GameStateManager] Evento eseguito: Giorno {ev.day}, {ev.phase}");
             }
             else
             {
-                foreach (var obj in ev.objectsToEnable)
-                    if (obj) obj.SetActive(false);
+                // se vuoi evitare toggle aggressivi, puoi rimuovere questa parte:
+                foreach (var obj in ev.objectsToEnable) if (obj) obj.SetActive(false);
             }
         }
 
+        // Notifica i listener (UI/adapter)
         OnPhaseChanged?.Invoke(CurrentDay, CurrentPhase);
+
+        // 👇 Centralizza qui la logica del “mattino”: resetta timer e refresha i pannelli
+        if (CurrentPhase == DayPhase.Morning)
+        {
+            TimerManager.Instance?.ResetToIdle();
+
+            // refresh una tantum di tutte le bacheche in scena (evento raro → costo trascurabile)
+            var panels = FindObjectsByType<BulletinController>(FindObjectsSortMode.None);
+            for (int i = 0; i < panels.Length; i++)
+                panels[i]?.RefreshNow();
+        }
     }
 }
