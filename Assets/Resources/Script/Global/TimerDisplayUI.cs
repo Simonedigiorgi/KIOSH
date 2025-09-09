@@ -197,9 +197,11 @@ public class TimerDisplayUI : MonoBehaviour
 
     private string GetWaitingLabelText()
     {
-        var tm = TimerManager.Instance;
-        return (tm != null)
-            ? waitingText + "\n" + TimerManager.FormatTime(tm.defaultDurationSeconds)
-            : waitingText + "\n00:00"; // solo mm:ss
+        // Prova prima l’Instance, altrimenti cerca 1 volta in scena (Unity 6 API)
+        var tm = TimerManager.Instance
+                 ?? FindFirstObjectByType<TimerManager>(FindObjectsInactive.Include);
+
+        float secs = (tm != null) ? tm.defaultDurationSeconds : 300f; // fallback opzionale
+        return waitingText + "\n" + TimerManager.FormatTime(secs);
     }
 }
