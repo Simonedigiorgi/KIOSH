@@ -42165,83 +42165,92 @@ MonoBehaviour:
   days:
   - hasNight: 1
     morning:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
     night:
-      toggles: []
+      actions:
+        m_PersistentCalls:
+          m_Calls:
+          - m_Target: {fileID: 1647917097}
+            m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
+            m_MethodName: SetActive
+            m_Mode: 6
+            m_Arguments:
+              m_ObjectArgument: {fileID: 0}
+              m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+              m_IntArgument: 0
+              m_FloatArgument: 0
+              m_StringArgument: 
+              m_BoolArgument: 1
+            m_CallState: 2
+  - hasNight: 0
+    morning:
+      actions:
+        m_PersistentCalls:
+          m_Calls:
+          - m_Target: {fileID: 1647917097}
+            m_TargetAssemblyTypeName: UnityEngine.GameObject, UnityEngine
+            m_MethodName: SetActive
+            m_Mode: 6
+            m_Arguments:
+              m_ObjectArgument: {fileID: 0}
+              m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+              m_IntArgument: 0
+              m_FloatArgument: 0
+              m_StringArgument: 
+              m_BoolArgument: 0
+            m_CallState: 2
+    night:
       actions:
         m_PersistentCalls:
           m_Calls: []
   - hasNight: 0
     morning:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
     night:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
   - hasNight: 0
     morning:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
     night:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
   - hasNight: 0
     morning:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
     night:
-      toggles: []
-      actions:
-        m_PersistentCalls:
-          m_Calls: []
-  - hasNight: 0
-    morning:
-      toggles: []
-      actions:
-        m_PersistentCalls:
-          m_Calls: []
-    night:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
   - hasNight: 1
     morning:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
     night:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
   - hasNight: 1
     morning:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
     night:
-      toggles: []
       actions:
         m_PersistentCalls:
           m_Calls: []
   globalMorningAlways:
-    toggles: []
     actions:
       m_PersistentCalls:
         m_Calls:
@@ -42258,7 +42267,6 @@ MonoBehaviour:
             m_BoolArgument: 0
           m_CallState: 2
   globalNightAlways:
-    toggles: []
     actions:
       m_PersistentCalls:
         m_Calls:
@@ -42276,7 +42284,6 @@ MonoBehaviour:
           m_CallState: 2
   defaultFadeIn: 10
   defaultFadeOut: 3
-  targetVolume: 0.6
   runDay1Intro: 1
   day1BlackHoldSeconds: 2
   day1FadeOutDuration: 1.5
@@ -42295,7 +42302,7 @@ AudioSource:
   m_audioClip: {fileID: 0}
   m_Resource: {fileID: 0}
   m_PlayOnAwake: 0
-  m_Volume: 1
+  m_Volume: 0.6
   m_Pitch: 1
   Loop: 0
   Mute: 0
