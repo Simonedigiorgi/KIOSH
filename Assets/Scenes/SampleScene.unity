@@ -447,6 +447,7 @@ MonoBehaviour:
   timerTickClip: {fileID: 8300000, guid: 953ac655e6c0ea34a9e28b01169314c9, type: 3}
   timerStopClip: {fileID: 8300000, guid: 89ce1959e04b1794485df0349b9fac9a, type: 3}
   taskCompleteClip: {fileID: 8300000, guid: bf27e5c6f75a08a4eb784f9072536f74, type: 3}
+  uiRefreshHz: 10
 --- !u!1 &34242531
 GameObject:
   m_ObjectHideFlags: 0
@@ -2482,6 +2483,7 @@ GameObject:
   - component: {fileID: 116279783}
   - component: {fileID: 116279785}
   - component: {fileID: 116279784}
+  - component: {fileID: 116279786}
   m_Layer: 0
   m_Name: Kitchen_Trigger
   m_TagString: Untagged
@@ -2498,7 +2500,7 @@ Transform:
   m_GameObject: {fileID: 116279782}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.05, y: 0.65000004, z: 5.6499996}
+  m_LocalPosition: {x: -8.05, y: 0.65000004, z: 5.3499994}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -2540,6 +2542,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 3, y: 1, z: 0.2}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!54 &116279786
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 116279782}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!1 &123192785
 GameObject:
   m_ObjectHideFlags: 0
@@ -13483,6 +13512,7 @@ GameObject:
   - component: {fileID: 599803923}
   - component: {fileID: 599803925}
   - component: {fileID: 599803924}
+  - component: {fileID: 599803926}
   m_Layer: 0
   m_Name: Room_Trigger
   m_TagString: Untagged
@@ -13499,7 +13529,7 @@ Transform:
   m_GameObject: {fileID: 599803922}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.05, y: 0.65000004, z: 6.499999}
+  m_LocalPosition: {x: -8.05, y: 0.65000004, z: 6.799999}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -13541,6 +13571,33 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 3, y: 1, z: 0.2}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!54 &599803926
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 599803922}
+  serializedVersion: 4
+  m_Mass: 1
+  m_Drag: 0
+  m_AngularDrag: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!43 &615781454
 Mesh:
   m_ObjectHideFlags: 0
@@ -17474,6 +17531,7 @@ MonoBehaviour:
   timerTickClip: {fileID: 8300000, guid: 953ac655e6c0ea34a9e28b01169314c9, type: 3}
   timerStopClip: {fileID: 8300000, guid: 89ce1959e04b1794485df0349b9fac9a, type: 3}
   taskCompleteClip: {fileID: 8300000, guid: bf27e5c6f75a08a4eb784f9072536f74, type: 3}
+  uiRefreshHz: 10
 --- !u!222 &887057283
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -20253,7 +20311,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1016186867}
   - component: {fileID: 1016186866}
-  - component: {fileID: 1016186871}
   - component: {fileID: 1016186865}
   - component: {fileID: 1016186868}
   - component: {fileID: 1016186869}
@@ -20281,12 +20338,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   speed: 2.5
-  mouseSensitivity: 120
+  mouseSensitivity: 80
+  mouseSmoothing: 0.05
   minLookAngle: -80
   maxLookAngle: 80
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 64
   animator: {fileID: 1016186872}
 --- !u!143 &1016186866
 CharacterController:
@@ -20347,6 +20402,7 @@ MonoBehaviour:
   interactableLayer:
     serializedVersion: 2
     m_Bits: 8
+  raycastHz: 10
   doorTag: RoomDoor
 --- !u!114 &1016186869
 MonoBehaviour:
@@ -20482,33 +20538,6 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!54 &1016186871
-Rigidbody:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1016186864}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 0
-  m_IsKinematic: 1
-  m_Interpolate: 0
-  m_Constraints: 0
-  m_CollisionDetection: 0
 --- !u!95 &1016186872
 Animator:
   serializedVersion: 7

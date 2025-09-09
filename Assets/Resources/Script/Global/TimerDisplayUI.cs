@@ -8,11 +8,16 @@ public class TimerDisplayUI : MonoBehaviour
 
     [Header("Audio")]
     public AudioSource audioSource;
-    public AudioClip timerTickClip;   // singolo "tic"
+    public AudioClip timerTickClip;
     public AudioClip timerStopClip;
-    public AudioClip taskCompleteClip; // 🔊 nuovo audio al completamento task
+    public AudioClip taskCompleteClip;
 
-    // 🔒 Testi interni
+    [Header("Perf")]
+    [Tooltip("How often the running UI refreshes (Hz). 10 = every 0.1s")]
+    [Range(2f, 30f)] public float uiRefreshHz = 10f;
+
+    private WaitForSecondsRealtime uiWait;
+
     private const string waitingText = "Waiting for operator C526-2";
     private const string workText = "Do your job";
     private const string taskCompleteText = "Job complete, return to the room";
@@ -20,13 +25,16 @@ public class TimerDisplayUI : MonoBehaviour
     private const string successText = "Operator C526-2 day completed";
 
     private bool lockText = false;
-
-    // Per gestire i “tic” ogni secondo
     private int lastDisplayedSecond = -1;
+    private string lastHeader = "";
+    private bool lastRunning = false;
+
+    private Coroutine uiLoop;
 
     void Awake()
     {
         if (!audioSource) audioSource = GetComponent<AudioSource>();
+        uiWait = new WaitForSecondsRealtime(1f / Mathf.Max(2f, uiRefreshHz));
     }
 
     void OnEnable()
@@ -36,15 +44,28 @@ public class TimerDisplayUI : MonoBehaviour
         TimerManager.OnTaskCompletedGlobal += OnTaskCompleted;
         TimerManager.OnDayCompletedGlobal += OnDayCompleted;
 
-        // 👇 ascolta il cambio fase per sbloccare la UI al mattino
         if (GameStateManager.Instance != null)
             GameStateManager.Instance.OnPhaseChanged += OnPhaseChanged;
 
-        if (label) label.text = GetWaitingLabelText();
+        lastDisplayedSecond = -1;
+        lastHeader = waitingText;
+        lastRunning = false;
+
+        var tm = TimerManager.Instance;
+        if (tm != null && tm.IsRunning)
+        {
+            StartUiLoop();
+        }
+        else
+        {
+            if (label) label.text = GetWaitingLabelText();
+        }
     }
 
     void OnDisable()
     {
+        StopUiLoop();
+
         TimerManager.OnTimerStartedGlobal -= OnTimerStarted;
         TimerManager.OnTimerCompletedGlobal -= OnTimerCompleted;
         TimerManager.OnTaskCompletedGlobal -= OnTaskCompleted;
@@ -54,42 +75,21 @@ public class TimerDisplayUI : MonoBehaviour
             GameStateManager.Instance.OnPhaseChanged -= OnPhaseChanged;
     }
 
-    void Update()
-    {
-        var tm = TimerManager.Instance;
-        if (!label || tm == null) return;
-        if (lockText) return;
-
-        if (tm.IsRunning)
-        {
-            string header = tm.DeliveriesCompleted ? taskCompleteText : workText;
-            label.text = header + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
-
-            // 🎵 Gestione tick audio
-            int currentSecond = Mathf.CeilToInt(tm.RemainingSeconds);
-            if (currentSecond != lastDisplayedSecond && currentSecond > 0)
-            {
-                lastDisplayedSecond = currentSecond;
-                PlayTick();
-            }
-            return;
-        }
-
-        // Timer fermo, non ancora avviato
-        label.text = GetWaitingLabelText();
-        lastDisplayedSecond = -1; // reset
-    }
-
+    // ---------- Events ----------
     private void OnTimerStarted()
     {
-        lastDisplayedSecond = -1; // reset per sicurezza
+        lastDisplayedSecond = -1;
+        lastRunning = true;
+        StartUiLoop();
     }
 
     private void OnTimerCompleted()
     {
+        StopUiLoop();
         PlayStop();
         if (label) label.text = failText + "\n00:00:000";
-        lockText = true; // resta fisso fino a reload
+        lockText = true;
+        lastRunning = false;
     }
 
     private void OnTaskCompleted()
@@ -97,21 +97,90 @@ public class TimerDisplayUI : MonoBehaviour
         var tm = TimerManager.Instance;
         if (!tm || !label) return;
 
+        // header changes; loop will keep refreshing remaining time
+        lastHeader = taskCompleteText;
         label.text = taskCompleteText + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
         lockText = false;
 
-        // 🔊 suono task completato
         if (audioSource && taskCompleteClip)
             audioSource.PlayOneShot(taskCompleteClip);
     }
 
     private void OnDayCompleted()
     {
+        StopUiLoop();
         PlayStop();
         if (label) label.text = successText;
         lockText = true;
+        lastRunning = false;
     }
 
+    private void OnPhaseChanged(int day, DayPhase phase)
+    {
+        if (phase == DayPhase.Morning)
+        {
+            TimerManager.Instance?.ResetToIdle();
+            lockText = false;
+            lastDisplayedSecond = -1;
+            lastHeader = waitingText;
+            lastRunning = false;
+            StopUiLoop();
+            if (label) label.text = GetWaitingLabelText();
+        }
+        else
+        {
+            // di notte: niente loop, resta il testo corrente
+            StopUiLoop();
+        }
+    }
+
+    // ---------- Loop ----------
+    private void StartUiLoop()
+    {
+        if (uiLoop != null) return;
+        uiLoop = StartCoroutine(UiRunningLoop());
+    }
+
+    private void StopUiLoop()
+    {
+        if (uiLoop != null)
+        {
+            StopCoroutine(uiLoop);
+            uiLoop = null;
+        }
+    }
+
+    private System.Collections.IEnumerator UiRunningLoop()
+    {
+        var tm = TimerManager.Instance;
+
+        while (tm != null && tm.IsRunning && !lockText)
+        {
+            string header = tm.DeliveriesCompleted ? taskCompleteText : workText;
+            int currentSecond = Mathf.CeilToInt(tm.RemainingSeconds);
+
+            if (currentSecond != lastDisplayedSecond || header != lastHeader || !lastRunning)
+            {
+                if (label) label.text = header + "\n" + TimerManager.FormatTime(tm.RemainingSeconds);
+
+                if (currentSecond != lastDisplayedSecond && currentSecond > 0)
+                    PlayTick();
+
+                lastDisplayedSecond = currentSecond;
+                lastHeader = header;
+                lastRunning = true;
+            }
+
+            yield return uiWait;
+        }
+
+        // usciti dal loop: non correndo più → se non lockato, torna a waiting
+        lastRunning = false;
+        if (!lockText && label) label.text = GetWaitingLabelText();
+        uiLoop = null;
+    }
+
+    // ---------- Helpers ----------
     private void PlayTick()
     {
         if (audioSource && timerTickClip)
@@ -127,29 +196,11 @@ public class TimerDisplayUI : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Restituisce il testo da mostrare quando il timer non è ancora avviato.
-    /// </summary>
     private string GetWaitingLabelText()
     {
         var tm = TimerManager.Instance;
-        if (tm != null)
-            return waitingText + "\n" + TimerManager.FormatTime(tm.defaultDurationSeconds);
-        else
-            return waitingText + "\n00:00:000";
-    }
-
-    private void OnPhaseChanged(int day, DayPhase phase)
-    {
-        if (phase == DayPhase.Morning)
-        {
-            // reset logica timer
-            TimerManager.Instance?.ResetToIdle();
-
-            // reset UI
-            lockText = false;
-            lastDisplayedSecond = -1;
-            if (label) label.text = GetWaitingLabelText();
-        }
+        return (tm != null)
+            ? waitingText + "\n" + TimerManager.FormatTime(tm.defaultDurationSeconds)
+            : waitingText + "\n00:00:000";
     }
 }

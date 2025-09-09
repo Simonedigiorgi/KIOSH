@@ -9,6 +9,12 @@ public class PlayerInteractor : MonoBehaviour
     [SerializeField] private float interactDistance = 3f;
     [SerializeField] private LayerMask interactableLayer;
 
+    [Header("Perf")]
+    [Tooltip("How often to update aim raycast. Set to 0 to only raycast on E.")]
+    [Range(0f, 30f)] public float raycastHz = 10f; // 0 = only on demand
+
+    private float _nextRaycastTime = 0f;
+
     private Camera playerCamera;
     private GameObject heldObject;
     private PickupObject heldPickup;
@@ -16,14 +22,13 @@ public class PlayerInteractor : MonoBehaviour
     public GameObject currentTarget { get; private set; }
     public IInteractable currentInteractable { get; private set; }
 
-    // accessor pubblici sicuri
     public PickupObject HeldPickup => heldPickup;
     public GameObject HeldObject => heldObject;
 
-    // Buffer riusabile per raycast
+    // Reusable buffer
     private static readonly RaycastHit[] hitsBuffer = new RaycastHit[12];
 
-    // Cache porta per evitare Find ad ogni pressione
+    // Cached door
     [SerializeField] private string doorTag = "RoomDoor";
     private RoomDoor cachedDoor;
 
@@ -36,15 +41,12 @@ public class PlayerInteractor : MonoBehaviour
     private void CacheDoor()
     {
         if (cachedDoor) return;
-
         if (!string.IsNullOrEmpty(doorTag))
         {
             var go = GameObject.FindWithTag(doorTag);
             if (go) cachedDoor = go.GetComponent<RoomDoor>();
         }
-
-        if (!cachedDoor)
-            cachedDoor = FindObjectOfType<RoomDoor>(); // fallback one-shot
+        if (!cachedDoor) cachedDoor = FindObjectOfType<RoomDoor>(); // one-shot fallback
     }
 
     void Update()
@@ -52,17 +54,27 @@ public class PlayerInteractor : MonoBehaviour
         if (HUDManager.Instance != null && HUDManager.Instance.IsDialogOpen)
             return;
 
-        UpdateRaycastTarget();
+        // Throttled aim raycast (optional)
+        if (raycastHz > 0f && Time.time >= _nextRaycastTime)
+        {
+            UpdateRaycastTargetInternal();
+            _nextRaycastTime = Time.time + 1f / raycastHz;
+        }
 
         if (Input.GetKeyDown(KeyCode.E))
+        {
+            // Force a fresh raycast just before interacting
+            if (raycastHz == 0f) UpdateRaycastTargetInternal();
+
             HandleInteraction();
+        }
 
         if (Input.GetKeyDown(KeyCode.Q))
             DropHeld();
     }
 
     // ---------- TARGET SELECTION ----------
-    void UpdateRaycastTarget()
+    private void UpdateRaycastTargetInternal()
     {
         currentTarget = null;
         currentInteractable = null;
@@ -72,7 +84,6 @@ public class PlayerInteractor : MonoBehaviour
 
         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
 
-        // Raycast filtrato per layer (niente allocazioni)
         int count = Physics.RaycastNonAlloc(ray, hitsBuffer, interactDistance, interactableLayer, QueryTriggerInteraction.Ignore);
         float bestDist = float.MaxValue;
         IInteractable bestInteractable = null;
@@ -84,11 +95,10 @@ public class PlayerInteractor : MonoBehaviour
             var go = h.collider ? h.collider.gameObject : null;
             if (!go) continue;
 
-            // ignora oggetto in mano
+            // ignore held object
             if (heldObject != null && (go == heldObject || go.transform.IsChildOf(heldObject.transform)))
                 continue;
 
-            // prova a prendere IInteractable rapidamente
             IInteractable it = go.GetComponent<IInteractable>();
             if (it == null) it = go.GetComponentInParent<IInteractable>();
             if (it == null) continue;
@@ -109,9 +119,9 @@ public class PlayerInteractor : MonoBehaviour
     }
 
     // ---------- CORE ----------
-    void HandleInteraction()
+    private void HandleInteraction()
     {
-        // Caso speciale: spioncino
+        // Peephole special case
         if (!cachedDoor) CacheDoor();
         if (cachedDoor != null && cachedDoor.IsLookingThroughPeephole)
         {
@@ -136,7 +146,7 @@ public class PlayerInteractor : MonoBehaviour
         pickup.PickUp(handPivot);
     }
 
-    void DropHeld()
+    private void DropHeld()
     {
         if (heldPickup) heldPickup.Drop();
         ClearHeld();
