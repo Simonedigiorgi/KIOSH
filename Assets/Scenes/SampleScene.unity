@@ -540,7 +540,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 1023
 --- !u!114 &33408481
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -604,7 +604,6 @@ MonoBehaviour:
   timerTickClip: {fileID: 8300000, guid: 953ac655e6c0ea34a9e28b01169314c9, type: 3}
   timerStopClip: {fileID: 8300000, guid: 89ce1959e04b1794485df0349b9fac9a, type: 3}
   taskCompleteClip: {fileID: 8300000, guid: bf27e5c6f75a08a4eb784f9072536f74, type: 3}
-  uiRefreshHz: 10
 --- !u!1 &34242531
 GameObject:
   m_ObjectHideFlags: 0
@@ -2678,6 +2677,8 @@ MonoBehaviour:
   zoneType: 1
   fireOnce: 1
   resetOnWorkdayStart: 1
+  closeDoorOnBedroomEnterIfDeliveriesDone: 1
+  linkedDoor: {fileID: 0}
 --- !u!65 &116279785
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -14628,6 +14629,8 @@ MonoBehaviour:
   zoneType: 0
   fireOnce: 0
   resetOnWorkdayStart: 1
+  closeDoorOnBedroomEnterIfDeliveriesDone: 1
+  linkedDoor: {fileID: 0}
 --- !u!65 &599803925
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -15898,8 +15901,6 @@ GameObject:
   - component: {fileID: 752855815}
   - component: {fileID: 752855814}
   - component: {fileID: 752855819}
-  - component: {fileID: 752855822}
-  - component: {fileID: 752855821}
   - component: {fileID: 752855820}
   m_Layer: 5
   m_Name: BulletinCanvas
@@ -15981,7 +15982,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 1023
 --- !u!114 &752855817
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16143,42 +16144,6 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
---- !u!114 &752855821
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 752855812}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 66d6aa2ec1cea86408f8cb0a446fb94b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  systems:
-  - name: Tubo pneumatico
-    isOperational: 1
-  - name: Luci
-    isOperational: 1
-  - name: Corrente
-    isOperational: 1
-  - name: Sistema informatico
-    isOperational: 1
-  - name: Ventilazione
-    isOperational: 0
---- !u!114 &752855822
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 752855812}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 71c09828b4866484d9ffaf9047a6b0ad, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  menuTitle: Giornata di lavoro
 --- !u!43 &761561326
 Mesh:
   m_ObjectHideFlags: 0
@@ -18923,7 +18888,6 @@ MonoBehaviour:
   timerTickClip: {fileID: 8300000, guid: 953ac655e6c0ea34a9e28b01169314c9, type: 3}
   timerStopClip: {fileID: 8300000, guid: 89ce1959e04b1794485df0349b9fac9a, type: 3}
   taskCompleteClip: {fileID: 8300000, guid: bf27e5c6f75a08a4eb784f9072536f74, type: 3}
-  uiRefreshHz: 10
 --- !u!222 &887057283
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -18948,7 +18912,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 1023
 --- !u!114 &887057285
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -22455,7 +22419,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 1023
 --- !u!114 &1016505098
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -22642,7 +22606,33 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 71c09828b4866484d9ffaf9047a6b0ad, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  menuTitle: Timer
+  onStartRequested:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 539653676}
+        m_TargetAssemblyTypeName: RoomDoor, Assembly-CSharp
+        m_MethodName: OpenDoor
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+      - m_Target: {fileID: 2100339116}
+        m_TargetAssemblyTypeName: TimerManager, Assembly-CSharp
+        m_MethodName: StartTimer
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!1 &1036416712
 GameObject:
   m_ObjectHideFlags: 0
@@ -29329,7 +29319,7 @@ MonoBehaviour:
   m_BlockingObjects: 0
   m_BlockingMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 1023
 --- !u!114 &1373314071
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -31885,9 +31875,23 @@ MonoBehaviour:
   doorAnimTime: 0.5
   deliveryGoal: 1
   bulletinController: {fileID: 752855815}
-  bulletinAdapter: {fileID: 752855819}
-  audioSource: {fileID: 1438744174}
+  doorToggleClip: {fileID: 0}
   deliveryClip: {fileID: 8300000, guid: c27a739b8f12aa34d8bb04567dde3256, type: 3}
+  onAllDeliveriesCompleted:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 539653676}
+        m_TargetAssemblyTypeName: RoomDoor, Assembly-CSharp
+        m_MethodName: OpenDoor
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!64 &1438744169
 MeshCollider:
   m_ObjectHideFlags: 0

@@ -14,9 +14,6 @@ public class TimerManager : MonoBehaviour
     private bool playerInsideRoom = false;
     private bool deliveriesCompleted = false;
 
-    // Sempre cache-ata via tag "RoomDoor"
-    private RoomDoor roomDoor;
-
     private bool dayCompleted = false;
     public bool DayCompleted => dayCompleted;
 
@@ -26,7 +23,7 @@ public class TimerManager : MonoBehaviour
     public bool IsPlayerInsideRoom => playerInsideRoom;
     public bool DeliveriesCompleted => deliveriesCompleted;
 
-    // Eventi globali
+    // Eventi globali (broadcast dominio)
     public static event Action OnTimerStartedGlobal;
     public static event Action OnTimerCompletedGlobal;
     public static event Action OnTaskCompletedGlobal;
@@ -38,12 +35,6 @@ public class TimerManager : MonoBehaviour
         Instance = this;
     }
 
-    // 👉 Prendiamo la porta in Start, quando la scena è pronta.
-    void Start()
-    {
-        CacheRoomDoor();
-    }
-
     void OnEnable() => DeliveryBulletinAdapter.OnAllDeliveriesCompleted += HandleAllDeliveriesCompleted;
     void OnDisable() => DeliveryBulletinAdapter.OnAllDeliveriesCompleted -= HandleAllDeliveriesCompleted;
 
@@ -51,7 +42,9 @@ public class TimerManager : MonoBehaviour
     {
         if (!running) return;
 
-        remaining -= Time.deltaTime;
+        // prima: remaining -= Time.deltaTime;
+        remaining -= Time.unscaledDeltaTime;   // ▶ conta anche se timeScale ≠ 1
+
         if (remaining <= 0f)
         {
             remaining = 0f;
@@ -69,18 +62,13 @@ public class TimerManager : MonoBehaviour
         deliveriesCompleted = false;
 
         if (running)
-        {
-            EnsureRoomDoor();
-            roomDoor?.OpenDoor();
-            OnTimerStartedGlobal?.Invoke();
-        }
+            OnTimerStartedGlobal?.Invoke(); // solo evento
     }
 
     private void CompleteTimer()
     {
         running = false;
         remaining = 0f;
-
         OnTimerCompletedGlobal?.Invoke();
     }
 
@@ -88,23 +76,22 @@ public class TimerManager : MonoBehaviour
     private void HandleAllDeliveriesCompleted()
     {
         deliveriesCompleted = true;
-        EnsureRoomDoor();
-        roomDoor?.OpenDoor();
-        OnTaskCompletedGlobal?.Invoke();
+        OnTaskCompletedGlobal?.Invoke();   // solo evento
     }
 
     // ===== Player state =====
     public void SetPlayerInsideRoom(bool inside)
     {
+        // Evita rientri ripetuti con lo stesso stato
+        if (playerInsideRoom == inside)
+            return;
+
         playerInsideRoom = inside;
 
-        if (inside && deliveriesCompleted)
+        // Emitti il "day completed" UNA volta sola
+        if (inside && deliveriesCompleted && !dayCompleted)
         {
-            EnsureRoomDoor();
-            roomDoor?.CloseDoor();
-
             if (running) running = false;
-
             dayCompleted = true;
             OnDayCompletedGlobal?.Invoke();
             Debug.Log("[TimerManager] Giorno completato: player rientrato in camera.");
@@ -120,20 +107,6 @@ public class TimerManager : MonoBehaviour
     }
 
     // ===== Utility =====
-    private void CacheRoomDoor()
-    {
-        var go = GameObject.FindWithTag("RoomDoor");
-        roomDoor = go ? go.GetComponent<RoomDoor>() : null;
-
-        if (!roomDoor)
-            Debug.LogWarning("[TimerManager] Nessuna RoomDoor trovata con tag 'RoomDoor'.");
-    }
-
-    private void EnsureRoomDoor()
-    {
-        if (!roomDoor) CacheRoomDoor(); // sempre e solo via tag
-    }
-
     public static string FormatTime(float seconds)
     {
         int secs = Mathf.Max(0, Mathf.CeilToInt(seconds));

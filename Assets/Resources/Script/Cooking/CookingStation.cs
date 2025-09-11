@@ -19,13 +19,69 @@ public class CookingStation : MonoBehaviour, IInteractable
 
     [Header("Fill Y Range (solo estetico)")]
     public float emptyY = 0.02f; // livello a vuoto
-    public float fullY = 0.24f; // livello a pieno
+    public float fullY = 0.24f;  // livello a pieno
 
     private Coroutine currentRoutine;
     private float progress = 0f;
 
     public enum State { Empty, Filling, Filled, Cooking, Cooked }
     public State CurrentState { get; private set; } = State.Empty;
+
+    // 🔔 Eventi globali per refresh pannello
+    public static event Action OnStationStateChanged;
+    private void RaiseStateChanged() => OnStationStateChanged?.Invoke();
+
+    // Shader perf
+    private static readonly int CookProgressID = Shader.PropertyToID("_CookProgress");
+    private MaterialPropertyBlock mpb;
+
+    // ---------- Lifecycle ----------
+    private void Awake()
+    {
+        if (fillRenderer && mpb == null) mpb = new MaterialPropertyBlock();
+    }
+
+    void OnEnable()
+    {
+        if (GameStateManager.Instance != null)
+            GameStateManager.Instance.OnPhaseChanged += HandlePhaseChanged;
+    }
+
+    void OnDisable()
+    {
+        if (GameStateManager.Instance != null)
+            GameStateManager.Instance.OnPhaseChanged -= HandlePhaseChanged;
+    }
+
+    private void OnPhaseChanged(int day, DayPhase phase)
+    {
+        // Reset SOLO al mattino
+        if (phase == DayPhase.Morning)
+            ResetToDefault();
+    }
+
+    /// <summary>
+    /// Reset completo allo stato di default (vuota, progress 0, shader 0).
+    /// Puoi anche richiamarlo da UnityEvent.
+    /// </summary>
+    public void ResetToDefault()
+    {
+        if (currentRoutine != null)
+        {
+            StopCoroutine(currentRoutine);
+            currentRoutine = null;
+        }
+
+        progress = 0f;
+        remainingServings = 0;
+        CurrentState = State.Empty;
+
+        SetCylinderHeight(emptyY);
+        UpdateShader(0f);
+
+        Debug.Log("[CookingStation] Reset al mattino → stato: Empty");
+        RaiseStateChanged();
+    }
 
     // ---------- Interazione ----------
     public void Interact(PlayerInteractor player)
@@ -53,10 +109,6 @@ public class CookingStation : MonoBehaviour, IInteractable
             ConsumeServing();
         }
     }
-
-    // 🔔 Eventi globali per refresh pannello
-    public static event Action OnStationStateChanged;
-    private void RaiseStateChanged() => OnStationStateChanged?.Invoke();
 
     // --- Inserimento ---
     public void InsertFood()
@@ -165,14 +217,18 @@ public class CookingStation : MonoBehaviour, IInteractable
     // --- Helpers ---
     private void SetCylinderHeight(float y)
     {
+        if (!fillCylinder) return;
         var p = fillCylinder.localPosition;
         fillCylinder.localPosition = new Vector3(p.x, y, p.z);
     }
 
     private void UpdateShader(float value)
     {
-        if (fillRenderer != null && fillRenderer.material.HasProperty("_CookProgress"))
-            fillRenderer.material.SetFloat("_CookProgress", value);
+        if (!fillRenderer) return;
+        if (mpb == null) mpb = new MaterialPropertyBlock();
+        fillRenderer.GetPropertyBlock(mpb);
+        mpb.SetFloat(CookProgressID, value);
+        fillRenderer.SetPropertyBlock(mpb);
     }
 
     private void ResetStation()
@@ -196,5 +252,15 @@ public class CookingStation : MonoBehaviour, IInteractable
             State.Cooked => $"✅ Cibo pronto! Porzioni rimaste: {remainingServings}/{maxServings}",
             _ => "Vuoto"
         };
+    }
+
+    private void HandlePhaseChanged(int day, DayPhase phase)
+    {
+        if (phase == DayPhase.Morning)
+        {
+            // torna sempre allo stato di default al mattino
+            ResetStation();
+        }
+        // se volessi behavior speciale di notte, gestiscilo qui
     }
 }

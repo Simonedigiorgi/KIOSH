@@ -49,21 +49,12 @@ public class RoomDoor : MonoBehaviour, IInteractable
     // ---------- IInteractable ----------
     public void Interact(PlayerInteractor interactor)
     {
-        // Se sto già guardando nello spioncino → E serve a uscire
-        if (isLookingThroughPeephole)
-        {
-            ExitPeephole();
-            return;
-        }
+        if (isLookingThroughPeephole) { ExitPeephole(); return; }
 
-        // Se colpisci lo spioncino (prima di entrarci)
         if (peephole != null && interactor.currentTarget == peephole.gameObject)
-        {
             InteractWithPeephole();
-        }
         else
         {
-            // Interazione con la porta
             if (isDoorOpen) CloseDoor();
             else OpenDoor();
         }
@@ -73,7 +64,6 @@ public class RoomDoor : MonoBehaviour, IInteractable
     public void OpenDoor()
     {
         if (isDoorOpen) return;
-
         isDoorOpen = true;
         StopAllCoroutines();
         StartCoroutine(SlideDoor(true));
@@ -83,7 +73,6 @@ public class RoomDoor : MonoBehaviour, IInteractable
     public void CloseDoor()
     {
         if (!isDoorOpen) return;
-
         isDoorOpen = false;
         StopAllCoroutines();
         StartCoroutine(SlideDoor(false));
@@ -95,7 +84,7 @@ public class RoomDoor : MonoBehaviour, IInteractable
         Vector3 start = transform.localPosition;
         Vector3 target = open ? doorOpenPos : doorClosedPos;
 
-        float t = 0;
+        float t = 0f;
         while (t < 1f)
         {
             t += Time.deltaTime * moveSpeed;
@@ -144,7 +133,7 @@ public class RoomDoor : MonoBehaviour, IInteractable
         Vector3 start = peephole.localPosition;
         Vector3 target = open ? peepholeOpenPos : peepholeClosedPos;
 
-        float t = 0;
+        float t = 0f;
         while (t < 1f)
         {
             t += Time.deltaTime * moveSpeed;

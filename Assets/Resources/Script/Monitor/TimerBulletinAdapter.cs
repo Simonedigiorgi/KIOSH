@@ -4,8 +4,11 @@ using UnityEngine.Events;
 
 public class TimerBulletinAdapter : BulletinAdapterBase
 {
-    [Header("UI")]
-    public string menuTitle = "Giornata di lavoro";
+    private string menuTitle = "Avvia la giornata di lavoro";
+
+    [Header("Events")]
+    [Tooltip("Invocato quando l’utente seleziona 'Avvia la giornata di lavoro'. Aggancia qui TimerManager.StartTimer, RoomDoor.OpenDoor, FX, ecc.")]
+    public UnityEvent onStartRequested;
 
     private BulletinController controller;
 
@@ -34,7 +37,9 @@ public class TimerBulletinAdapter : BulletinAdapterBase
 
     public override List<BulletinController.MenuOption> BuildOptions(List<BulletinController.MenuOption> baseOptions)
     {
-        var list = (baseOptions != null) ? new List<BulletinController.MenuOption>(baseOptions) : new List<BulletinController.MenuOption>();
+        var list = (baseOptions != null)
+            ? new List<BulletinController.MenuOption>(baseOptions)
+            : new List<BulletinController.MenuOption>();
 
         var tm = TimerManager.Instance;
         var gs = GameStateManager.Instance;
@@ -43,7 +48,7 @@ public class TimerBulletinAdapter : BulletinAdapterBase
         if (gs == null || gs.CurrentPhase != DayPhase.Morning) return list;
         if (tm != null && tm.IsRunning) return list;
 
-        // no doppioni
+        // niente duplicati
         if (list.Exists(o => o != null && o.title == menuTitle)) return list;
 
         var submenu = new BulletinController.MenuOption
@@ -65,14 +70,21 @@ public class TimerBulletinAdapter : BulletinAdapterBase
             action = BulletinController.MenuOption.MenuAction.Invoke,
             onInvoke = new UnityEvent()
         };
-        start.onInvoke.AddListener(() =>
-        {
-            TimerManager.Instance?.StartTimer();
-            controller?.RefreshNow();
-        });
-        submenu.subOptions.Add(start);
 
+        // Solo evento editor-friendly: niente avvio automatico qui
+        start.onInvoke.AddListener(HandleStartPressed);
+
+        submenu.subOptions.Add(start);
         list.Add(submenu);
         return list;
+    }
+
+    private void HandleStartPressed()
+    {
+        // Lancia SOLO l'UnityEvent configurato dall'Inspector
+        onStartRequested?.Invoke();
+
+        // refresh UI
+        controller?.RefreshNow();
     }
 }

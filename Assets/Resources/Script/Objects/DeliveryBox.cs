@@ -1,61 +1,85 @@
 ﻿using System.Collections;
 using UnityEngine;
+using UnityEngine.Events;
+using Sirenix.OdinInspector;
 
+[DisallowMultipleComponent]
+[RequireComponent(typeof(AudioSource))]
 public class DeliveryBox : MonoBehaviour, IInteractable
 {
+    // ---------- Stato piatto ----------
     private Dish currentDish;
+    private PickupObject currentPickup; // cache per evitare GetComponent ripetuti
     public Dish CurrentDish => currentDish;
+    public bool IsOccupied => currentDish != null;
 
+    // ---------- Sportello ----------
     [Header("Sportello")]
-    public Transform door;
-    public float doorOpenZ = -80f;
-    public float doorClosedZ = 0f;
-    public float doorAnimTime = 0.5f;
+    [Required, SerializeField] private Transform door;
+    [SerializeField] private float doorOpenZ = -80f;
+    [SerializeField] private float doorClosedZ = 0f;
+    [Min(0.01f), SerializeField] private float doorAnimTime = 0.5f;
+
     private bool isDoorOpen = false;
     private bool isDoorAnimating = false;
     public bool IsDoorOpen => isDoorOpen;
 
+    // ---------- Progresso ----------
     [Header("Progress")]
     public static int TotalDelivered = 0;
-    public int deliveryGoal = 10;
+    [Min(1)] public int deliveryGoal = 10;
 
+    // ---------- UI ----------
     [Header("UI (opzionale)")]
-    [SerializeField] private BulletinController bulletinController;
-    [SerializeField] private DeliveryBulletinAdapter bulletinAdapter;
+    [Required, SerializeField] private BulletinController bulletinController;
 
+    // ---------- Audio ----------
     [Header("Audio")]
-    [SerializeField] private AudioSource audioSource;
-    [SerializeField] private AudioClip deliveryClip; // 🔊 suono alla consegna
+    [SerializeField] private AudioClip doorToggleClip; // ⏯ unica clip per apri/chiudi sportello
+    [SerializeField] private AudioClip deliveryClip;   // 🔊 suono alla consegna
+    private AudioSource audioSource;                   // preso via GetComponent
 
-    // Reset automatico dei contatori statici ad ogni load di scena
+    // ---------- Events ----------
+    [Header("Events")]
+    public UnityEvent onAllDeliveriesCompleted; // editor-friendly (RoomDoor.OpenDoor, ecc.)
+
+    // ---------- Runtime ----------
+    private Coroutine doorRoutine;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void ResetStaticsOnSceneLoad()
-    {
-        TotalDelivered = 0;
-    }
+    private static void ResetStaticsOnSceneLoad() => TotalDelivered = 0;
 
     void Awake()
     {
-        if (!bulletinController)
-            bulletinController = GetComponent<BulletinController>()
-                               ?? GetComponentInParent<BulletinController>()
-                               ?? GetComponentInChildren<BulletinController>(true);
+        // Niente auto-find per la UI: ci fidiamo delle ref serializzate
+        // AudioSource sempre sullo stesso GO
+        audioSource = GetComponent<AudioSource>();
+    }
 
-        if (!audioSource)
-            audioSource = GetComponent<AudioSource>();
+    void OnValidate()
+    {
+        if (doorAnimTime < 0.01f) doorAnimTime = 0.01f;
+        if (deliveryGoal < 1) deliveryGoal = 1;
     }
 
     // ---------- IInteractable ----------
-    public void Interact(PlayerInteractor interactor)
-    {
-        ToggleDoor();
-    }
+    public void Interact(PlayerInteractor interactor) => ToggleDoor();
 
     // ========== SPORTELLO ==========
     public void ToggleDoor()
     {
-        if (door == null || isDoorAnimating) return;
-        StartCoroutine(AnimateDoor(!isDoorOpen));
+        if (!door || isDoorAnimating) return;
+        StartDoorAnimation(!isDoorOpen);
+    }
+
+    private void StartDoorAnimation(bool open)
+    {
+        if (doorRoutine != null) StopCoroutine(doorRoutine);
+
+        // SFX unico per apri/chiudi
+        if (doorToggleClip && audioSource) audioSource.PlayOneShot(doorToggleClip);
+
+        doorRoutine = StartCoroutine(AnimateDoor(open));
     }
 
     private IEnumerator AnimateDoor(bool open)
@@ -66,53 +90,56 @@ public class DeliveryBox : MonoBehaviour, IInteractable
         float targetZ = open ? doorOpenZ : doorClosedZ;
 
         float t = 0f;
+        float invDur = 1f / doorAnimTime;
+
         while (t < doorAnimTime)
         {
             t += Time.deltaTime;
-            float a = Mathf.Lerp(startZ, targetZ, t / doorAnimTime);
-            Vector3 e = door.localEulerAngles;
+            float k = t * invDur; if (k > 1f) k = 1f;
+            float a = Mathf.Lerp(startZ, targetZ, k);
+
+            var e = door.localEulerAngles;
             door.localEulerAngles = new Vector3(e.x, e.y, a);
+
             yield return null;
         }
 
-        Vector3 end = door.localEulerAngles;
+        // snap finale
+        var end = door.localEulerAngles;
         door.localEulerAngles = new Vector3(end.x, end.y, targetZ);
 
         isDoorOpen = open;
         isDoorAnimating = false;
+        doorRoutine = null;
 
-        if (currentDish != null)
-        {
-            var pickup = currentDish.GetComponent<PickupObject>();
-            if (pickup != null) pickup.canBePickedUp = isDoorOpen;
-        }
+        if (currentPickup) currentPickup.canBePickedUp = isDoorOpen;
 
-        NotifyUI();
+        RefreshUI();
     }
 
-    private float NormalizeAngle(float z) => (z > 180f) ? z - 360f : z;
+    private static float NormalizeAngle(float z) => (z > 180f) ? z - 360f : z;
 
     // ========== GESTIONE PIATTO ==========
     public void RegisterDish(Dish dish)
     {
         currentDish = dish;
-        if (dish != null)
-        {
-            var pickup = dish.GetComponent<PickupObject>();
-            if (pickup != null) pickup.canBePickedUp = isDoorOpen;
-        }
+        currentPickup = dish ? dish.GetComponent<PickupObject>() : null;
+
+        if (currentPickup) currentPickup.canBePickedUp = isDoorOpen;
+
         Debug.Log("[DeliveryBox] Piatto inserito nel delivery box.");
-        NotifyUI();
+        RefreshUI();
     }
 
     public void OnDishRemoved(Dish dish)
     {
-        if (currentDish == dish)
-        {
-            currentDish = null;
-            Debug.Log("[DeliveryBox] Piatto rimosso dalla DeliveryBox.");
-            NotifyUI();
-        }
+        if (currentDish != dish) return;
+
+        currentDish = null;
+        currentPickup = null;
+
+        Debug.Log("[DeliveryBox] Piatto rimosso dalla DeliveryBox.");
+        RefreshUI();
     }
 
     // ========== SPEDIZIONE ==========
@@ -123,44 +150,36 @@ public class DeliveryBox : MonoBehaviour, IInteractable
             Debug.Log("[DeliveryBox] Sportello aperto: chiudere per spedire.");
             return;
         }
-        if (currentDish == null) return;
+        if (!currentDish) return;
 
         if (!currentDish.IsComplete)
         {
-            Debug.Log("[DeliveryBox] Piatto incompleto: non puo essere spedito.");
+            Debug.Log("[DeliveryBox] Piatto incompleto: non può essere spedito.");
             return;
         }
 
         Debug.Log("[DeliveryBox] Piatto spedito!");
 
-        // 🔊 suono consegna
-        if (audioSource && deliveryClip)
-            audioSource.PlayOneShot(deliveryClip);
+        if (deliveryClip && audioSource) audioSource.PlayOneShot(deliveryClip);
 
         Destroy(currentDish.gameObject);
         currentDish = null;
+        currentPickup = null;
 
         TotalDelivered++;
-        NotifyUI();
+        RefreshUI();
 
         if (TotalDelivered >= deliveryGoal)
         {
             Debug.Log("[DeliveryBox] Tutte le consegne completate!");
             DeliveryBulletinAdapter.RaiseAllDeliveriesCompleted();
+            onAllDeliveriesCompleted?.Invoke();
         }
     }
 
-    public bool IsOccupied => currentDish != null;
-
     // ========== UI helper ==========
-    private void NotifyUI()
+    private void RefreshUI()
     {
-        if (!bulletinController)
-            bulletinController = GetComponent<BulletinController>()
-                               ?? GetComponentInParent<BulletinController>()
-                               ?? GetComponentInChildren<BulletinController>(true);
-
-        if (bulletinController)
-            bulletinController.RefreshNow();
+        if (bulletinController) bulletinController.RefreshNow();
     }
 }

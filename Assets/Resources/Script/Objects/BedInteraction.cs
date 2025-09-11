@@ -81,6 +81,9 @@ public class BedInteraction : MonoBehaviour, IInteractable
         // Timeline risveglio (per il fade-in audio usa un evento Morning con StartLoop)
         wakeUpTimeline?.Play();
 
+        // 👉 forza il testo del pannello coerente con la nuova fase (Morning/Night)
+        TimerDisplayUI.ForceIdleRefresh();
+
         if (player != null) player.SetControlsEnabled(true);
         isUsed = false;
     }
