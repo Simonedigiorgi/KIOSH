@@ -4,7 +4,7 @@ using UnityEngine.Events;
 
 public class TimerBulletinAdapter : BulletinAdapterBase
 {
-    private string menuTitle = "Avvia la giornata di lavoro";
+    private string menuTitle = "Protocollo di Preparazione e Consegna Pasti";
 
     [Header("Events")]
     [Tooltip("Invocato quando l’utente seleziona 'Avvia la giornata di lavoro'. Aggancia qui TimerManager.StartTimer, RoomDoor.OpenDoor, FX, ecc.")]
@@ -61,12 +61,12 @@ public class TimerBulletinAdapter : BulletinAdapterBase
         submenu.subOptions.Add(new BulletinController.MenuOption
         {
             action = BulletinController.MenuOption.MenuAction.LiveLabel,
-            dynamicTextProvider = () => "Timer inattivo"
+            dynamicTextProvider = () => "Il soggetto è tenuto a rispettare la seguente procedura operativa giornaliera.\r\nAlla conferma della giornata lavorativa, la porta della stanza verrà aperta e il timer avviato.\r\nEntro il tempo limite stabilito, il soggetto dovrà completare la preparazione e la consegna dei pasti richiesti.\r\nIl mancato adempimento comporterà l’attivazione del dispositivo esplosivo craniale."
         });
 
         var start = new BulletinController.MenuOption
         {
-            title = "Avvia la giornata di lavoro",
+            title = "Avvia protocollo",
             action = BulletinController.MenuOption.MenuAction.Invoke,
             onInvoke = new UnityEvent()
         };

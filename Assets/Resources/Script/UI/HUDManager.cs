@@ -45,16 +45,13 @@ public class HUDManager : MonoBehaviour
 
     void Start()
     {
-        interactor = FindObjectOfType<PlayerInteractor>();
-        playerController = FindObjectOfType<PlayerController>();
+        interactor = FindFirstObjectByType<PlayerInteractor>(FindObjectsInactive.Include);
+        playerController = FindFirstObjectByType<PlayerController>(FindObjectsInactive.Include);
 
         ClearTargetText();
 
-        if (dialogPanel)
-            dialogPanel.SetActive(false);
-
-        if (blackoutPanel)
-            blackoutPanel.SetActive(false); // spento all’avvio
+        if (dialogPanel) dialogPanel.SetActive(false);
+        if (blackoutPanel) blackoutPanel.SetActive(false);
     }
 
     void Update()
@@ -88,10 +85,8 @@ public class HUDManager : MonoBehaviour
         if (interactor != null && interactor.currentTarget != null)
         {
             var nameComp = interactor.currentTarget.GetComponentInParent<InteractableName>();
-            if (nameComp != null)
-                targetNameText.text = nameComp.displayName;
-            else
-                ClearTargetText();
+            if (nameComp != null) targetNameText.text = nameComp.displayName;
+            else ClearTargetText();
         }
         else
         {
@@ -114,10 +109,7 @@ public class HUDManager : MonoBehaviour
     }
 
     // ---------- Interazioni ----------
-    public void SetInteracting(bool value)
-    {
-        isInteracting = value;
-    }
+    public void SetInteracting(bool value) => isInteracting = value;
 
     // ---------- Blackout (helper) ----------
     CanvasGroup GetOrAddBlackoutCanvasGroup()
@@ -128,21 +120,16 @@ public class HUDManager : MonoBehaviour
         return cg;
     }
 
-    /// <summary>Attiva il pannello blackout (senza toccare l'alpha).</summary>
     public void ShowBlackout()
     {
-        if (blackoutPanel)
-            blackoutPanel.SetActive(true);
+        if (blackoutPanel) blackoutPanel.SetActive(true);
     }
 
-    /// <summary>Disattiva il pannello blackout.</summary>
     public void HideBlackout()
     {
-        if (blackoutPanel)
-            blackoutPanel.SetActive(false);
+        if (blackoutPanel) blackoutPanel.SetActive(false);
     }
 
-    /// <summary>Setta immediatamente alpha del blackout (0..1). Attiva il pannello se serve.</summary>
     public void SetBlackoutAlpha(float a)
     {
         if (!blackoutPanel) return;
@@ -151,13 +138,8 @@ public class HUDManager : MonoBehaviour
         if (cg) cg.alpha = Mathf.Clamp01(a);
     }
 
-    /// <summary>Imposta subito nero pieno (alpha=1) e attiva il pannello.</summary>
-    public void ShowBlackoutImmediateFull()
-    {
-        SetBlackoutAlpha(1f);
-    }
+    public void ShowBlackoutImmediateFull() => SetBlackoutAlpha(1f);
 
-    /// <summary>Fade IN: da 0 a 1 in duration secondi (lascia attivo e nero).</summary>
     public IEnumerator FadeBlackout(float duration)
     {
         if (!blackoutPanel) yield break;
@@ -165,22 +147,18 @@ public class HUDManager : MonoBehaviour
         blackoutPanel.SetActive(true);
         var canvasGroup = GetOrAddBlackoutCanvasGroup();
 
-        float from = 0f;
-        float to = 1f;
-
+        float from = 0f, to = 1f;
         canvasGroup.alpha = from;
         float t = 0f;
         while (t < duration)
         {
             t += Time.deltaTime;
-            float k = Mathf.Clamp01(t / duration);
-            canvasGroup.alpha = Mathf.Lerp(from, to, k);
+            canvasGroup.alpha = Mathf.Lerp(from, to, Mathf.Clamp01(t / duration));
             yield return null;
         }
         canvasGroup.alpha = to;
     }
 
-    /// <summary>Fade OUT: da 1 a 0 in duration secondi (alla fine lascia attivo ma trasparente).</summary>
     public IEnumerator FadeBlackoutOut(float duration)
     {
         if (!blackoutPanel) yield break;
@@ -188,43 +166,61 @@ public class HUDManager : MonoBehaviour
         blackoutPanel.SetActive(true);
         var canvasGroup = GetOrAddBlackoutCanvasGroup();
 
-        float from = 1f;
-        float to = 0f;
-
+        float from = 1f, to = 0f;
         canvasGroup.alpha = from;
         float t = 0f;
         while (t < duration)
         {
             t += Time.deltaTime;
-            float k = Mathf.Clamp01(t / duration);
-            canvasGroup.alpha = Mathf.Lerp(from, to, k);
+            canvasGroup.alpha = Mathf.Lerp(from, to, Mathf.Clamp01(t / duration));
             yield return null;
         }
         canvasGroup.alpha = to;
-        // Se preferisci spegnerlo del tutto alla fine, decommenta:
+        // Se vuoi spegnerlo del tutto:
         // blackoutPanel.SetActive(false);
     }
 
-    // ---------- Dialoghi ----------
-    public void ShowDialog(HUDMessageSet messageSet)
-    {
-        if (messageSet == null || messageSet.lines == null || messageSet.lines.Length == 0)
-            return;
-
-        StartDialog(messageSet.lines);
-    }
-
+    // ---------- Dialoghi (NUOVE API, senza HUDMessageSet) ----------
+    /// <summary>Mostra un singolo messaggio.</summary>
     public void ShowDialog(string message)
     {
         if (string.IsNullOrEmpty(message)) return;
         StartDialog(new string[] { message });
     }
 
+    /// <summary>Mostra una sequenza di righe (params).</summary>
+    public void ShowDialogLines(params string[] lines)
+    {
+        if (lines == null || lines.Length == 0) return;
+        StartDialog(lines);
+    }
+
+    /// <summary>Mostra una sequenza di righe (List).</summary>
+    public void ShowDialogList(List<string> lines)
+    {
+        if (lines == null || lines.Count == 0) return;
+        StartDialog(lines);
+    }
+
+    /// <summary>Mostra righe caricate da un TextAsset (una riga per newline).</summary>
+    public void ShowDialogFromTextAsset(TextAsset textAsset)
+    {
+        if (!textAsset) return;
+        var lines = textAsset.text.Replace("\r\n", "\n").Split('\n');
+        StartDialog(lines);
+    }
+
+    // ---------- Interni dialog ----------
     private void StartDialog(IEnumerable<string> lines)
     {
         dialogQueue.Clear();
         foreach (var line in lines)
-            dialogQueue.Enqueue(line);
+        {
+            if (!string.IsNullOrEmpty(line))
+                dialogQueue.Enqueue(line);
+        }
+
+        if (dialogQueue.Count == 0) return;
 
         isShowingDialog = true;
         if (dialogPanel) dialogPanel.SetActive(true);
@@ -232,8 +228,7 @@ public class HUDManager : MonoBehaviour
         // blocca movimento/rotazione player
         playerController?.SetControlsEnabled(false);
 
-        if (dialogText && dialogQueue.Count > 0)
-            dialogText.text = dialogQueue.Peek();
+        if (dialogText) dialogText.text = dialogQueue.Peek();
 
         // evita skip immediato
         allowAdvanceAt = Time.time + advanceDebounce;
@@ -257,7 +252,6 @@ public class HUDManager : MonoBehaviour
     {
         isShowingDialog = false;
         if (dialogPanel) dialogPanel.SetActive(false);
-
         playerController?.SetControlsEnabled(true);
     }
 }
