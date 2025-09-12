@@ -8,6 +8,12 @@ public class CookingStation : MonoBehaviour, IInteractable
     public Transform fillCylinder;
     public Renderer fillRenderer;
 
+    [Header("Liquid Jet")]
+    [Tooltip("GameObject del getto liquido (es. cilindro con shader/particle).")]
+    public GameObject liquidJet;
+    [SerializeField] private float liquidFadeTime = 0.3f; // tempo animazione fade
+    private Coroutine liquidRoutine;
+
     [Header("Times")]
     public float fillTime = 3f;
     public float cookTime = 5f;
@@ -81,6 +87,11 @@ public class CookingStation : MonoBehaviour, IInteractable
 
         Debug.Log("[CookingStation] Reset al mattino → stato: Empty");
         RaiseStateChanged();
+
+        if (liquidJet) liquidJet.SetActive(false);
+
+        Debug.Log("[CookingStation] Reset al mattino → stato: Empty");
+        RaiseStateChanged();
     }
 
     // ---------- Interazione ----------
@@ -124,6 +135,9 @@ public class CookingStation : MonoBehaviour, IInteractable
         progress = 0f;
         RaiseStateChanged();
 
+        // 👉 accendi con fade
+        SetLiquidJet(true);
+
         float t = 0f;
         while (t < fillTime)
         {
@@ -136,8 +150,13 @@ public class CookingStation : MonoBehaviour, IInteractable
 
         CurrentState = State.Filled;
         progress = 1f;
+
+        // 👉 spegni con fade
+        SetLiquidJet(false);
+
         RaiseStateChanged();
     }
+
 
     // --- Cottura ---
     public void StartCooking()
@@ -237,9 +256,14 @@ public class CookingStation : MonoBehaviour, IInteractable
         progress = 0f;
         CurrentState = State.Empty;
         remainingServings = 0;
+
+        // 👉 spegni sempre il getto se attivo
+        if (liquidJet) liquidJet.SetActive(false);
+
         Debug.Log("[CookingStation] Pentola svuotata. Stato: Empty");
         RaiseStateChanged();
     }
+
 
     // --- UI ---
     public string GetProgressText()
@@ -263,4 +287,39 @@ public class CookingStation : MonoBehaviour, IInteractable
         }
         // se volessi behavior speciale di notte, gestiscilo qui
     }
+
+    private void SetLiquidJet(bool active)
+    {
+        if (!liquidJet) return;
+
+        if (liquidRoutine != null) StopCoroutine(liquidRoutine);
+        liquidRoutine = StartCoroutine(LerpLiquidJet(active));
+    }
+
+    private IEnumerator LerpLiquidJet(bool turnOn)
+    {
+        if (turnOn && !liquidJet.activeSelf)
+        {
+            liquidJet.SetActive(true);
+            liquidJet.transform.localScale = new Vector3(0f, 1f, 0f);
+        }
+
+        float t = 0f;
+        Vector3 start = liquidJet.transform.localScale;
+        Vector3 target = turnOn ? Vector3.one : new Vector3(0f, 1f, 0f);
+
+        while (t < liquidFadeTime)
+        {
+            t += Time.deltaTime;
+            float k = Mathf.Clamp01(t / liquidFadeTime);
+            liquidJet.transform.localScale = Vector3.Lerp(start, target, k);
+            yield return null;
+        }
+
+        liquidJet.transform.localScale = target;
+
+        if (!turnOn) liquidJet.SetActive(false);
+        liquidRoutine = null;
+    }
+
 }
