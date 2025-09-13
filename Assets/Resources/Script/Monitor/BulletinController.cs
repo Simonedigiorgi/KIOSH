@@ -5,6 +5,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
+using Sirenix.OdinInspector;
 
 public class BulletinController : MonoBehaviour
 {

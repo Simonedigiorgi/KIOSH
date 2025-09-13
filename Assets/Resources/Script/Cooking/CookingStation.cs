@@ -21,6 +21,7 @@ public class CookingStation : MonoBehaviour, IInteractable
 
     [Header("Servings")]
     public int maxServings = 5;
+    public int RemainingServings => remainingServings;
     private int remainingServings = 0;
 
     [Header("Fill Y Range (solo estetico)")]
@@ -28,14 +29,15 @@ public class CookingStation : MonoBehaviour, IInteractable
     public float fullY = 0.24f;  // livello a pieno
 
     private Coroutine currentRoutine;
+    public float Progress01 => progress;
     private float progress = 0f;
 
     public enum State { Empty, Filling, Filled, Cooking, Cooked }
     public State CurrentState { get; private set; } = State.Empty;
 
-    // 🔔 Eventi globali per refresh pannello
+    // Eventi per UI/adapter
     public static event Action OnStationStateChanged;
-    private void RaiseStateChanged() => OnStationStateChanged?.Invoke();
+    public event Action OnStateChanged;              // di istanza (più fine)
 
     // Shader perf
     private static readonly int CookProgressID = Shader.PropertyToID("_CookProgress");
@@ -45,53 +47,65 @@ public class CookingStation : MonoBehaviour, IInteractable
     private void Awake()
     {
         if (fillRenderer && mpb == null) mpb = new MaterialPropertyBlock();
+        if (liquidJet) liquidJet.SetActive(false);
+        SetCylinderHeight(emptyY);
+        UpdateShader(0f);
     }
 
-    void OnEnable()
+    private void OnEnable()
     {
         if (GameStateManager.Instance != null)
             GameStateManager.Instance.OnPhaseChanged += HandlePhaseChanged;
     }
 
-    void OnDisable()
+    private void OnDisable()
     {
         if (GameStateManager.Instance != null)
             GameStateManager.Instance.OnPhaseChanged -= HandlePhaseChanged;
     }
 
-    private void OnPhaseChanged(int day, DayPhase phase)
+    private void HandlePhaseChanged(int day, DayPhase phase)
     {
-        // Reset SOLO al mattino
         if (phase == DayPhase.Morning)
-            ResetToDefault();
+            ResetToDefault(); // ogni mattino torna vuota
     }
 
-    /// <summary>
-    /// Reset completo allo stato di default (vuota, progress 0, shader 0).
-    /// Puoi anche richiamarlo da UnityEvent.
-    /// </summary>
+    /// Reset completo allo stato di default.
     public void ResetToDefault()
     {
-        if (currentRoutine != null)
-        {
-            StopCoroutine(currentRoutine);
-            currentRoutine = null;
-        }
+        StopActiveRoutines();
 
         progress = 0f;
         remainingServings = 0;
-        CurrentState = State.Empty;
+        SetState(State.Empty);
 
         SetCylinderHeight(emptyY);
         UpdateShader(0f);
-
-        Debug.Log("[CookingStation] Reset al mattino → stato: Empty");
-        RaiseStateChanged();
-
         if (liquidJet) liquidJet.SetActive(false);
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("[CookingStation] Reset al mattino → stato: Empty");
+#endif
         RaiseStateChanged();
+    }
+
+    private void StopActiveRoutines()
+    {
+        if (currentRoutine != null) { StopCoroutine(currentRoutine); currentRoutine = null; }
+        if (liquidRoutine != null) { StopCoroutine(liquidRoutine); liquidRoutine = null; }
+    }
+
+    private void SetState(State s)
+    {
+        if (CurrentState == s) return;
+        CurrentState = s;
+        RaiseStateChanged();
+    }
+
+    private void RaiseStateChanged()
+    {
+        OnStateChanged?.Invoke();
+        OnStationStateChanged?.Invoke();
     }
 
     // ---------- Interazione ----------
@@ -103,7 +117,6 @@ public class CookingStation : MonoBehaviour, IInteractable
         var dish = held.GetComponent<Dish>();
         if (dish == null) return;
 
-        // Feedback chiari
         if (dish.IsComplete)
         {
             HUDManager.Instance?.ShowDialog("Questo piatto è già pieno.");
@@ -131,12 +144,10 @@ public class CookingStation : MonoBehaviour, IInteractable
 
     private IEnumerator FillRoutine()
     {
-        CurrentState = State.Filling;
+        SetState(State.Filling);
         progress = 0f;
-        RaiseStateChanged();
 
-        // 👉 accendi con fade
-        SetLiquidJet(true);
+        SetLiquidJet(true); // accendi con fade
 
         float t = 0f;
         while (t < fillTime)
@@ -148,15 +159,13 @@ public class CookingStation : MonoBehaviour, IInteractable
             yield return null;
         }
 
-        CurrentState = State.Filled;
         progress = 1f;
+        SetState(State.Filled);
 
-        // 👉 spegni con fade
-        SetLiquidJet(false);
+        SetLiquidJet(false); // spegni con fade
 
-        RaiseStateChanged();
+        currentRoutine = null;
     }
-
 
     // --- Cottura ---
     public void StartCooking()
@@ -168,10 +177,8 @@ public class CookingStation : MonoBehaviour, IInteractable
 
     private IEnumerator CookRoutine()
     {
-        CurrentState = State.Cooking;
+        SetState(State.Cooking);
         progress = 0f;
-        RaiseStateChanged();
-
         UpdateShader(0f);
 
         float t = 0f;
@@ -183,16 +190,17 @@ public class CookingStation : MonoBehaviour, IInteractable
             yield return null;
         }
 
-        CurrentState = State.Cooked;
         progress = 1f;
         UpdateShader(1f);
 
-        // ✅ porzioni pronte, SEMPRE uguali a maxServings
         remainingServings = Mathf.Max(1, maxServings);
         SetCylinderHeight(fullY);
+        SetState(State.Cooked);
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"[CookingStation] Cottura completata. Porzioni: {remainingServings}/{maxServings}");
-        RaiseStateChanged();
+#endif
+        currentRoutine = null;
     }
 
     // --- Servings ---
@@ -204,24 +212,25 @@ public class CookingStation : MonoBehaviour, IInteractable
 
         remainingServings = Mathf.Max(remainingServings - 1, 0);
 
-        // Altezza puramente estetica, proporzionale alle porzioni rimaste
         float ratio = (maxServings > 0) ? (float)remainingServings / maxServings : 0f;
         float targetY = Mathf.Lerp(emptyY, fullY, ratio);
 
         if (currentRoutine != null) StopCoroutine(currentRoutine);
         currentRoutine = StartCoroutine(LerpCylinderY(targetY));
 
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"[CookingStation] Porzione servita. Rimaste: {remainingServings}/{maxServings}");
+#endif
 
         if (remainingServings <= 0)
-            ResetStation();   // torna vuota solo quando FINISCE davvero
+            ResetStation();   // torna vuota quando finisce davvero
         else
             RaiseStateChanged();
     }
 
     private IEnumerator LerpCylinderY(float targetY)
     {
-        float startY = fillCylinder.localPosition.y;
+        float startY = fillCylinder ? fillCylinder.localPosition.y : 0f;
         float t = 0f;
         while (t < consumeAnimTime)
         {
@@ -231,6 +240,7 @@ public class CookingStation : MonoBehaviour, IInteractable
             yield return null;
         }
         SetCylinderHeight(targetY);
+        currentRoutine = null;
     }
 
     // --- Helpers ---
@@ -252,74 +262,53 @@ public class CookingStation : MonoBehaviour, IInteractable
 
     private void ResetStation()
     {
+        StopActiveRoutines();
+
         SetCylinderHeight(emptyY);
         progress = 0f;
-        CurrentState = State.Empty;
         remainingServings = 0;
-
-        // 👉 spegni sempre il getto se attivo
         if (liquidJet) liquidJet.SetActive(false);
 
+        SetState(State.Empty);
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log("[CookingStation] Pentola svuotata. Stato: Empty");
-        RaiseStateChanged();
-    }
-
-
-    // --- UI ---
-    public string GetProgressText()
-    {
-        return CurrentState switch
-        {
-            State.Filling => $"Riempimento: {(progress * 100f):F0}%",
-            State.Cooking => $"Cottura: {(progress * 100f):F0}%",
-            State.Filled => "Cibo inserito, pronto a cucinare",
-            State.Cooked => $"✅ Cibo pronto! Porzioni rimaste: {remainingServings}/{maxServings}",
-            _ => "Vuoto"
-        };
-    }
-
-    private void HandlePhaseChanged(int day, DayPhase phase)
-    {
-        if (phase == DayPhase.Morning)
-        {
-            // torna sempre allo stato di default al mattino
-            ResetStation();
-        }
-        // se volessi behavior speciale di notte, gestiscilo qui
+#endif
     }
 
     private void SetLiquidJet(bool active)
     {
         if (!liquidJet) return;
-
         if (liquidRoutine != null) StopCoroutine(liquidRoutine);
         liquidRoutine = StartCoroutine(LerpLiquidJet(active));
     }
 
     private IEnumerator LerpLiquidJet(bool turnOn)
     {
+        var tr = liquidJet.transform;
+
         if (turnOn && !liquidJet.activeSelf)
         {
             liquidJet.SetActive(true);
-            liquidJet.transform.localScale = new Vector3(0f, 1f, 0f);
+            tr.localScale = new Vector3(0f, tr.localScale.y, 0f); // raggio 0, altezza invariata
         }
 
         float t = 0f;
-        Vector3 start = liquidJet.transform.localScale;
-        Vector3 target = turnOn ? Vector3.one : new Vector3(0f, 1f, 0f);
+        Vector3 start = tr.localScale;
+        Vector3 target = turnOn ? new Vector3(0.75f, start.y, 0.75f) : new Vector3(0f, start.y, 0f);
 
         while (t < liquidFadeTime)
         {
             t += Time.deltaTime;
             float k = Mathf.Clamp01(t / liquidFadeTime);
-            liquidJet.transform.localScale = Vector3.Lerp(start, target, k);
+            var s = Vector3.Lerp(start, target, k);
+            tr.localScale = new Vector3(s.x, start.y, s.z); // blocca Y
             yield return null;
         }
 
-        liquidJet.transform.localScale = target;
+        tr.localScale = target;
 
         if (!turnOn) liquidJet.SetActive(false);
         liquidRoutine = null;
     }
-
 }
