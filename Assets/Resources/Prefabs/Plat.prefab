@@ -956,7 +956,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   canBePickedUp: 1
   isHeld: 0
-  type: 2
+  type: 0
   currentPlacePoint: {fileID: 0}
 --- !u!114 &147451148226082390
 MonoBehaviour:
@@ -971,7 +971,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ingredientPivot: {fileID: 7320093189705889203}
-  maxIngredients: 2
+  filledPrefab: {fileID: 0}
 --- !u!43 &3489473763428342992
 Mesh:
   m_ObjectHideFlags: 0

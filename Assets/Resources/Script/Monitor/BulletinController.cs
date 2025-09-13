@@ -14,7 +14,7 @@ public class BulletinController : MonoBehaviour
     private const float LAYOUT_REBUILD_INTERVAL = 0.10f; // 10 fps max per i rebuild
 
     [Header("Root Options (statiche da Inspector)")]
-    public List<MenuOption> mainOptions; // <-- SOLO base statiche
+    public List<MenuOption> mainOptions;
 
     // Copia immutabile delle opzioni di base (snapshot preso in Awake)
     private List<MenuOption> baseStaticOptions;
@@ -51,24 +51,12 @@ public class BulletinController : MonoBehaviour
     [Header("UI Behavior")]
     public bool showBackWhenIdle = true;
 
-    [Header("Colors")]
-    public Color labelColor = new(0.75f, 0.9f, 1f);
-    public Color selectableNormalColor = Color.white;
-    public Color selectableHighlightColor = Color.green;
-
     [Header("Testi")]
     public string backLabel = "Back";
 
-    [Header("Input")]
-    public KeyCode confirmKey = KeyCode.E;
-    public KeyCode upKey = KeyCode.W;
-    public KeyCode downKey = KeyCode.S;
-    public KeyCode prevPageKey = KeyCode.A;
-    public KeyCode nextPageKey = KeyCode.D;
+    [Header("Config")]
+    public BulletinConfig config;
 
-    [Header("Audio")]
-    public AudioClip sfxMove;
-    public AudioClip sfxConfirm;
     private AudioSource audioSource;
 
     // Reading
@@ -97,7 +85,6 @@ public class BulletinController : MonoBehaviour
         public List<MenuOption> subOptions;
         public UnityEvent onInvoke;
 
-        // Provider di testo live per le LiveLabel (non serializzato in Inspector).
         [System.NonSerialized] public Func<string> dynamicTextProvider;
     }
 
@@ -107,10 +94,7 @@ public class BulletinController : MonoBehaviour
         if (!audioSource) audioSource = gameObject.AddComponent<AudioSource>();
         if (!listPanel) Debug.LogError("[BulletinController] Assegna ListPanel nel Inspector.");
 
-        // Snapshot delle opzioni statiche impostate da Inspector
-        baseStaticOptions = (mainOptions != null) ? new List<MenuOption>(mainOptions)
-                                                  : new List<MenuOption>();
-        // all’avvio mostriamo almeno le statiche
+        baseStaticOptions = (mainOptions != null) ? new List<MenuOption>(mainOptions) : new List<MenuOption>();
         lastBuiltOptions = new List<MenuOption>(baseStaticOptions);
     }
 
@@ -118,7 +102,6 @@ public class BulletinController : MonoBehaviour
     {
         StartCoroutine(DeferredRefresh());
 
-        // Refresh automatico al cambio fase (mattina/notte)
         if (GameStateManager.Instance != null)
             GameStateManager.Instance.OnPhaseChanged += OnPhaseChanged_Global;
     }
@@ -135,32 +118,23 @@ public class BulletinController : MonoBehaviour
         RefreshNow();
     }
 
-    /// <summary>
-    /// Ricostruisce le opzioni da mostrare partendo SEMPRE dalle statiche
-    /// e applicando tutti gli Adapter trovati nel pannello.
-    /// </summary>
     public void RefreshNow()
     {
-        // riparti sempre dalle opzioni statiche salvate in Awake
         var options = new List<MenuOption>(baseStaticOptions);
 
-        // applica tutti gli adapter presenti nel pannello
         var adapters = GetComponentsInChildren<BulletinAdapterBase>(true);
         foreach (var adapter in adapters)
         {
             options = adapter.BuildOptions(options) ?? options;
         }
 
-        // memorizza l’ultima build (solo per UI)
         lastBuiltOptions = options;
-
-        // mostra a schermo (senza toccare le opzioni statiche)
         ShowMenu(lastBuiltOptions);
     }
 
     void Update()
     {
-        // --- Aggiornamento etichette live (sempre attive) ---
+        // Aggiornamento etichette live
         if (liveLines.Count > 0)
         {
             bool anyChanged = false;
@@ -178,7 +152,6 @@ public class BulletinController : MonoBehaviour
                 liveLines[i] = ll;
             }
 
-            // 🔧 Throttle del rebuild layout (riduce stutter)
             if (anyChanged && listPanel && Time.unscaledTime >= _nextLayoutRebuildTime)
             {
                 var rt = listPanel.GetComponent<RectTransform>();
@@ -187,14 +160,14 @@ public class BulletinController : MonoBehaviour
             }
         }
 
-        // --- Interazione utente solo se attivo ---
+        // Interazione utente
         if (!isInteracting) return;
         if (Time.frameCount == openedAtFrame) return;
 
-        if (Input.GetKeyDown(downKey)) { MoveSelection(1); PlayMove(); }
-        if (Input.GetKeyDown(upKey)) { MoveSelection(-1); PlayMove(); }
+        if (Input.GetKeyDown(config.downKey)) { MoveSelection(1); PlayMove(); }
+        if (Input.GetKeyDown(config.upKey)) { MoveSelection(-1); PlayMove(); }
 
-        if (Input.GetKeyDown(confirmKey))
+        if (Input.GetKeyDown(config.confirmKey))
         {
             PlayConfirm();
             if (state == MenuState.General) ConfirmGeneral();
@@ -203,8 +176,8 @@ public class BulletinController : MonoBehaviour
 
         if (state == MenuState.Reading)
         {
-            if (Input.GetKeyDown(prevPageKey)) { PreviousPage(); PlayMove(); }
-            if (Input.GetKeyDown(nextPageKey)) { NextPage(); PlayMove(); }
+            if (Input.GetKeyDown(config.prevPageKey)) { PreviousPage(); PlayMove(); }
+            if (Input.GetKeyDown(config.nextPageKey)) { NextPage(); PlayMove(); }
         }
     }
 
@@ -216,7 +189,6 @@ public class BulletinController : MonoBehaviour
         openedAtFrame = Time.frameCount;
 
         menuHistory.Clear();
-        // mostra l’ultima build se esiste, altrimenti le statiche
         ShowMenu(lastBuiltOptions ?? baseStaticOptions);
     }
 
@@ -250,10 +222,9 @@ public class BulletinController : MonoBehaviour
     {
         if (activeLines.Count == 0) return;
 
-        // ultima riga = Back
         if (currentMenuIndex == activeLines.Count - 1) { GoBack(); return; }
 
-        int optIndex = currentMenuIndex; // 1:1 con selectableOptions
+        int optIndex = currentMenuIndex;
         if (optIndex < 0 || optIndex >= selectableOptions.Count) return;
 
         var selected = selectableOptions[optIndex];
@@ -271,13 +242,7 @@ public class BulletinController : MonoBehaviour
             case MenuOption.MenuAction.Invoke:
                 selected.onInvoke?.Invoke();
                 menuHistory.Clear();
-                // dopo un’azione, ricalcoliamo la build corrente
                 RefreshNow();
-                break;
-
-            case MenuOption.MenuAction.Label:
-            case MenuOption.MenuAction.LiveLabel:
-                // non selezionabili
                 break;
         }
     }
@@ -412,7 +377,7 @@ public class BulletinController : MonoBehaviour
     private void CreateSelectableLine(Transform parent, string text, MenuOption opt)
     {
         var t = SpawnLine(parent, text);
-        t.color = opt.customColor ?? selectableNormalColor;
+        t.color = opt.customColor ?? config.selectableNormalColor;
 
         activeLines.Add(t);
         selectableOptions.Add(opt);
@@ -421,25 +386,23 @@ public class BulletinController : MonoBehaviour
     private void CreateLabelLine(Transform parent, string text, MenuOption opt = null)
     {
         var t = SpawnLine(parent, text);
-
-        if (opt != null && opt.customColor.HasValue)
-            t.color = opt.customColor.Value;
-        else
-            t.color = labelColor;
+        t.color = (opt != null && opt.customColor.HasValue)
+            ? opt.customColor.Value
+            : config.labelColor;
     }
 
     private void CreateLiveLabelLine(Transform parent, Func<string> getter)
     {
         string initial = getter != null ? getter() : string.Empty;
         var t = SpawnLine(parent, initial);
-        t.color = labelColor;
+        t.color = config.labelColor;
         liveLines.Add(new LiveLine { text = t, getter = getter, last = initial });
     }
 
     private void CreateBackLine(Transform parent)
     {
         var t = SpawnLine(parent, backLabel);
-        t.color = selectableNormalColor;
+        t.color = config.selectableNormalColor;
         activeLines.Add(t);
     }
 
@@ -471,7 +434,9 @@ public class BulletinController : MonoBehaviour
         {
             var t = activeLines[i];
             if (!t) continue;
-            t.color = (i == currentMenuIndex) ? selectableHighlightColor : selectableNormalColor;
+            t.color = (i == currentMenuIndex)
+                ? config.selectableHighlightColor
+                : config.selectableNormalColor;
         }
     }
 
@@ -508,17 +473,16 @@ public class BulletinController : MonoBehaviour
 
     private void PlayMove()
     {
-        if (audioSource && sfxMove) audioSource.PlayOneShot(sfxMove);
+        if (audioSource && config.sfxMove) audioSource.PlayOneShot(config.sfxMove);
     }
 
     private void PlayConfirm()
     {
-        if (audioSource && sfxConfirm) audioSource.PlayOneShot(sfxConfirm);
+        if (audioSource && config.sfxConfirm) audioSource.PlayOneShot(config.sfxConfirm);
     }
 
     private void OnPhaseChanged_Global(int day, DayPhase phase)
     {
-        // Ricostruisci l’intero pannello quando cambia fase
         RefreshNow();
     }
 }
