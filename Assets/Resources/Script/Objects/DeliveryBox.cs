@@ -2,6 +2,7 @@
 using UnityEngine;
 using UnityEngine.Events;
 using Sirenix.OdinInspector;
+using System; // <— serve per Action<int>
 
 [DisallowMultipleComponent]
 [RequireComponent(typeof(AudioSource))]
@@ -43,11 +44,18 @@ public class DeliveryBox : MonoBehaviour, IInteractable
     [Header("Events")]
     public UnityEvent onAllDeliveriesCompleted; // editor-friendly (RoomDoor.OpenDoor, ecc.)
 
+    // 🔔 Nuovo: notifica ogni volta che cambia il totale spedito
+    public static event Action<int> OnDeliveredCountChanged;
+
     // ---------- Runtime ----------
     private Coroutine doorRoutine;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void ResetStaticsOnSceneLoad() => TotalDelivered = 0;
+    private static void ResetStaticsOnSceneLoad()
+    {
+        TotalDelivered = 0;
+        OnDeliveredCountChanged?.Invoke(TotalDelivered); // reset listener al cambio scena
+    }
 
     void Awake()
     {
@@ -167,6 +175,10 @@ public class DeliveryBox : MonoBehaviour, IInteractable
         currentPickup = null;
 
         TotalDelivered++;
+
+        // 🔔 Notifica globale del nuovo totale
+        OnDeliveredCountChanged?.Invoke(TotalDelivered);
+
         RefreshUI();
 
         if (TotalDelivered >= deliveryGoal)
