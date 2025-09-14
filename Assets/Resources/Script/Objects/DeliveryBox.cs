@@ -194,4 +194,10 @@ public class DeliveryBox : MonoBehaviour, IInteractable
     {
         if (bulletinController) bulletinController.RefreshNow();
     }
+
+    public static void ResetDailyDeliveries()
+    {
+        TotalDelivered = 0;
+        OnDeliveredCountChanged?.Invoke(TotalDelivered); // avvisa gli adapter/UI
+    }
 }

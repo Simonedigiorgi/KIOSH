@@ -28,6 +28,13 @@ public class CookingStation : MonoBehaviour, IInteractable
     public float emptyY = 0.02f; // livello a vuoto
     public float fullY = 0.24f;  // livello a pieno
 
+    // 🔒 Gating produzione quando il delivery goal è raggiunto
+    [Header("Delivery Gate (opzionale)")]
+    [Tooltip("Se impostato, quando TotalDelivered >= deliveryGoal non è più possibile preparare cibo.")]
+    public DeliveryBox deliveryBox;
+    [Tooltip("Messaggio HUD quando il goal è raggiunto.")]
+    public string msgGoalReached = "Tutte le consegne sono state completate. Non è possibile preparare altro cibo.";
+
     private Coroutine currentRoutine;
     public float Progress01 => progress;
     private float progress = 0f;
@@ -108,6 +115,22 @@ public class CookingStation : MonoBehaviour, IInteractable
         OnStationStateChanged?.Invoke();
     }
 
+    // ---------- Helpers gate ----------
+    private bool IsDeliveryGoalReached()
+    {
+        return deliveryBox != null && DeliveryBox.TotalDelivered >= deliveryBox.deliveryGoal;
+    }
+
+    private bool DenyIfGoalReached()
+    {
+        if (IsDeliveryGoalReached())
+        {
+            HUDManager.Instance?.ShowDialog(msgGoalReached);
+            return true;
+        }
+        return false;
+    }
+
     // ---------- Interazione ----------
     public void Interact(PlayerInteractor player)
     {
@@ -138,6 +161,8 @@ public class CookingStation : MonoBehaviour, IInteractable
     public void InsertFood()
     {
         if (CurrentState != State.Empty) return;
+        if (DenyIfGoalReached()) return; // ⛔ blocco produzione a goal raggiunto
+
         if (currentRoutine != null) StopCoroutine(currentRoutine);
         currentRoutine = StartCoroutine(FillRoutine());
     }
@@ -171,6 +196,8 @@ public class CookingStation : MonoBehaviour, IInteractable
     public void StartCooking()
     {
         if (CurrentState != State.Filled) return;
+        if (DenyIfGoalReached()) return; // ⛔ blocco produzione a goal raggiunto
+
         if (currentRoutine != null) StopCoroutine(currentRoutine);
         currentRoutine = StartCoroutine(CookRoutine());
     }
@@ -216,19 +243,23 @@ public class CookingStation : MonoBehaviour, IInteractable
         float targetY = Mathf.Lerp(emptyY, fullY, ratio);
 
         if (currentRoutine != null) StopCoroutine(currentRoutine);
-        currentRoutine = StartCoroutine(LerpCylinderY(targetY));
+
+        bool isLast = remainingServings <= 0;
+        currentRoutine = StartCoroutine(LerpCylinderY(targetY, isLast));
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         Debug.Log($"[CookingStation] Porzione servita. Rimaste: {remainingServings}/{maxServings}");
 #endif
 
-        if (remainingServings <= 0)
-            ResetStation();   // torna vuota quando finisce davvero
-        else
+        if (!isLast)
+        {
+            // per le porzioni intermedie notifichiamo subito
             RaiseStateChanged();
+        }
+        // se è l'ultima, il Reset arriverà dopo il lerp (vedi LerpCylinderY)
     }
 
-    private IEnumerator LerpCylinderY(float targetY)
+    private IEnumerator LerpCylinderY(float targetY, bool resetAfter = false)
     {
         float startY = fillCylinder ? fillCylinder.localPosition.y : 0f;
         float t = 0f;
@@ -241,6 +272,13 @@ public class CookingStation : MonoBehaviour, IInteractable
         }
         SetCylinderHeight(targetY);
         currentRoutine = null;
+
+        if (resetAfter)
+        {
+            // aspetta un frame per garantire update UI, poi reset completo
+            yield return null;
+            ResetStation(); // ora l'anim è finita, non verrà interrotta
+        }
     }
 
     // --- Helpers ---

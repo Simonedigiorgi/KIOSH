@@ -163,10 +163,20 @@ public class GameStateManager : MonoBehaviour
         // Mattino centralizzato
         if (CurrentPhase == DayPhase.Morning)
         {
+            // ✅ azzera le consegne del giorno e notifica gli adapter
+            DeliveryBox.ResetDailyDeliveries();
+
+            // reset timer e refresh pannelli
             if (timer) timer.ResetToIdle();
+
             var n = panels?.Length ?? 0;
-            for (int i = 0; i < n; i++) { var p = panels[i]; if (p) p.RefreshNow(); }
+            for (int i = 0; i < n; i++)
+            {
+                var p = panels[i];
+                if (p) p.RefreshNow();
+            }
         }
+
 
         // Intro solo Morning Giorno 1 (una volta)
         if (!didRunDay1Intro && runDay1Intro && CurrentDayIndex == 0 && CurrentPhase == DayPhase.Morning)

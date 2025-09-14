@@ -16,7 +16,7 @@ public class CookingBulletinAdapter : BulletinAdapterBase
     [Tooltip("Script che, quando clicchi (Interact), dà il piatto al giocatore.")]
     public DishDispenser dishDispenser;
 
-    [Tooltip("DeliveryBox usata per spedire: serve a bloccare 'Ottieni piatto' quando il goal è raggiunto.")]
+    [Tooltip("DeliveryBox usata per spedire: serve a bloccare tutto quando il goal è raggiunto.")]
     public DeliveryBox deliveryBox;
 
     [Header("Layers")]
@@ -33,6 +33,7 @@ public class CookingBulletinAdapter : BulletinAdapterBase
     [TextArea] public string cookingFormat = "Cottura, Attendere: {0}%";
     [TextArea] public string cookedFormat = "Cibo pronto! Porzioni rimaste: {0}/{1}";
     [TextArea] public string getDishLabel = "Ottieni piatto";
+    [TextArea] public string goalReachedText = "Consegne completate — produzione chiusa.";
 
     [Header("Feedback")]
     [TextArea] public string msgNoStationReady = "La pentola non è pronta o non ha porzioni disponibili.";
@@ -53,14 +54,16 @@ public class CookingBulletinAdapter : BulletinAdapterBase
     {
         controller = GetComponentInParent<BulletinController>();
 
-        // risolvi i layer
         _interactableLayer = LayerMask.NameToLayer(interactableLayerName);
         _disabledLayer = LayerMask.NameToLayer(disabledLayerName);
         if (_interactableLayer < 0) { _interactableLayer = 0; Debug.LogWarning("[CookingBulletinAdapter] Layer 'Interactable' non trovato, uso Default(0)."); }
         if (_disabledLayer < 0) { _disabledLayer = 0; }
 
-        // fallback: se non setti il target, usa il GO del dispenser
         if (!interactTarget && dishDispenser) interactTarget = dishDispenser.gameObject;
+
+        // assicura che la station conosca la deliveryBox per il gate (opzionale ma utile)
+        if (station && deliveryBox && !station.deliveryBox)
+            station.deliveryBox = deliveryBox;
     }
 
     void OnEnable()
@@ -70,11 +73,9 @@ public class CookingBulletinAdapter : BulletinAdapterBase
         if (GameStateManager.Instance != null)
             GameStateManager.Instance.OnPhaseChanged += HandlePhaseChanged;
 
-        // 🔔 ascolta spedizioni
         DeliveryBox.OnDeliveredCountChanged += HandleDeliveredCountChanged;
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted += HandleAllDeliveriesCompleted;
 
-        // stato iniziale goal (in caso si ricarichi con progresso)
         if (deliveryBox && DeliveryBox.TotalDelivered >= deliveryBox.deliveryGoal)
         {
             isDeliveryGoalReached = true;
@@ -92,7 +93,6 @@ public class CookingBulletinAdapter : BulletinAdapterBase
         DeliveryBox.OnDeliveredCountChanged -= HandleDeliveredCountChanged;
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted -= HandleAllDeliveriesCompleted;
 
-        // sicurezza: torna layer disattivo
         ArmInteractTarget(false);
     }
 
@@ -100,23 +100,22 @@ public class CookingBulletinAdapter : BulletinAdapterBase
     {
         if (phase == DayPhase.Morning)
         {
-            // NON resetto isDeliveryGoalReached (il goal è per la giornata corrente)
-            hasUndeliveredDish = false;
-            deliveredCountWhenTaken = DeliveryBox.TotalDelivered;
-            ArmInteractTarget(false);
+            // ✅ nuovo giorno → pannello operativo
+            isDeliveryGoalReached = false;        // sblocca UI
+            hasUndeliveredDish = false;           // azzera gating "uno alla volta"
+            deliveredCountWhenTaken = DeliveryBox.TotalDelivered; // sarà 0 dopo il reset
+            ArmInteractTarget(false);             // sicurezza
         }
         RefreshPanel();
     }
 
     private void HandleDeliveredCountChanged(int newTotal)
     {
-        // appena spedisci il piatto → riabilita la voce
         if (hasUndeliveredDish && newTotal > deliveredCountWhenTaken)
         {
             hasUndeliveredDish = false;
         }
 
-        // se hai raggiunto il goal → blocca definitivamente
         if (deliveryBox && newTotal >= deliveryBox.deliveryGoal)
         {
             isDeliveryGoalReached = true;
@@ -147,7 +146,6 @@ public class CookingBulletinAdapter : BulletinAdapterBase
             return list;
         }
 
-        // stato corrente del goal (fallback se l'evento non è ancora arrivato)
         bool goalReachedNow = isDeliveryGoalReached
                               || (deliveryBox && DeliveryBox.TotalDelivered >= deliveryBox.deliveryGoal);
 
@@ -159,6 +157,17 @@ public class CookingBulletinAdapter : BulletinAdapterBase
             dynamicTextProvider = BuildStatusText
         });
 
+        // Se goal raggiunto, mostra un messaggio e basta
+        if (goalReachedNow)
+        {
+            list.Add(new BulletinController.MenuOption
+            {
+                title = goalReachedText,
+                action = BulletinController.MenuOption.MenuAction.Label
+            });
+            return list;
+        }
+
         // Inserisci cibo
         if (station.CurrentState == CookingStation.State.Empty)
             list.Add(MakeInvoke("Inserisci cibo", station.InsertFood));
@@ -167,11 +176,10 @@ public class CookingBulletinAdapter : BulletinAdapterBase
         if (station.CurrentState == CookingStation.State.Filled)
             list.Add(MakeInvoke("Cucina cibo", station.StartCooking));
 
-        // Ottieni piatto → mostra solo se: pentola pronta + non stai aspettando una spedizione + goal non raggiunto
+        // Ottieni piatto → mostra solo se: pentola pronta + non stai aspettando una spedizione
         if (station.CurrentState == CookingStation.State.Cooked &&
             station.CanServeDish() &&
-            !hasUndeliveredDish &&
-            !goalReachedNow)
+            !hasUndeliveredDish)
         {
             list.Add(MakeInvoke(getDishLabel, HandleArmGetDish));
         }
@@ -213,7 +221,7 @@ public class CookingBulletinAdapter : BulletinAdapterBase
     // ====== “Ottieni piatto” → arma/disarma il target Interactable ======
     private void HandleArmGetDish()
     {
-        // blocco se goal raggiunto (ulteriore safeguard)
+        // safeguard se nel frattempo hai raggiunto il goal
         if (deliveryBox && DeliveryBox.TotalDelivered >= deliveryBox.deliveryGoal)
         {
             isDeliveryGoalReached = true;
@@ -241,12 +249,10 @@ public class CookingBulletinAdapter : BulletinAdapterBase
         hasUndeliveredDish = true;
         deliveredCountWhenTaken = DeliveryBox.TotalDelivered;
 
-        // 3) Anti-spam: appena il player prende qualcosa in mano,
-        //    disattiviamo di nuovo il target per evitare più piatti in fila.
+        // 3) Anti-spam: quando il player prende qualcosa in mano → disarma
         if (armRoutine != null) StopCoroutine(armRoutine);
         armRoutine = StartCoroutine(WaitUntilPlayerHoldsSomethingThenDisarm());
 
-        // Aggiorna UI
         RefreshPanel();
     }
 
@@ -255,7 +261,6 @@ public class CookingBulletinAdapter : BulletinAdapterBase
         var player = FindFirstObjectByType<PlayerInteractor>(FindObjectsInactive.Include);
         if (!player) yield break;
 
-        // aspetta che prenda qualcosa (tipicamente il piatto dal dispenser)
         while (!player.IsHoldingObject())
             yield return null;
 
