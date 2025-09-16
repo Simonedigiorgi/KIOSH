@@ -20,9 +20,4 @@ public class Dish : MonoBehaviour
         isFilled = true;
         return true;
     }
-
-    void OnDestroy()
-    {
-        FindObjectOfType<DishDispenser>()?.RemoveDish(gameObject);
-    }
 }

@@ -44,18 +44,13 @@ public class BulletinController : MonoBehaviour
     private TMP_Text readingBodyLine;
     private BulletinInteraction activeInteraction;
 
-    [Header("UI")]
-    public GameObject listPanel;
-    public TMP_Text lineTemplate;
+    [BoxGroup("Components")] public BulletinConfig bulletinConfig;
 
-    [Header("UI Behavior")]
-    public bool showBackWhenIdle = true;
+    [BoxGroup("UI")] public GameObject listPanel;
+    [BoxGroup("UI")] public TMP_Text lineTemplate;
 
-    [Header("Testi")]
-    public string backLabel = "Back";
-
-    [Header("Config")]
-    public BulletinConfig config;
+    [BoxGroup("UI Behavior")] public bool showBackWhenIdle = true;
+    [BoxGroup("UI Behavior")] public string backLabel = "Back";
 
     private AudioSource audioSource;
 
@@ -164,10 +159,10 @@ public class BulletinController : MonoBehaviour
         if (!isInteracting) return;
         if (Time.frameCount == openedAtFrame) return;
 
-        if (Input.GetKeyDown(config.downKey)) { MoveSelection(1); PlayMove(); }
-        if (Input.GetKeyDown(config.upKey)) { MoveSelection(-1); PlayMove(); }
+        if (Input.GetKeyDown(bulletinConfig.downKey)) { MoveSelection(1); PlayMove(); }
+        if (Input.GetKeyDown(bulletinConfig.upKey)) { MoveSelection(-1); PlayMove(); }
 
-        if (Input.GetKeyDown(config.confirmKey))
+        if (Input.GetKeyDown(bulletinConfig.confirmKey))
         {
             PlayConfirm();
             if (state == MenuState.General) ConfirmGeneral();
@@ -176,8 +171,8 @@ public class BulletinController : MonoBehaviour
 
         if (state == MenuState.Reading)
         {
-            if (Input.GetKeyDown(config.prevPageKey)) { PreviousPage(); PlayMove(); }
-            if (Input.GetKeyDown(config.nextPageKey)) { NextPage(); PlayMove(); }
+            if (Input.GetKeyDown(bulletinConfig.prevPageKey)) { PreviousPage(); PlayMove(); }
+            if (Input.GetKeyDown(bulletinConfig.nextPageKey)) { NextPage(); PlayMove(); }
         }
     }
 
@@ -377,7 +372,7 @@ public class BulletinController : MonoBehaviour
     private void CreateSelectableLine(Transform parent, string text, MenuOption opt)
     {
         var t = SpawnLine(parent, text);
-        t.color = opt.customColor ?? config.selectableNormalColor;
+        t.color = opt.customColor ?? bulletinConfig.selectableNormalColor;
 
         activeLines.Add(t);
         selectableOptions.Add(opt);
@@ -388,21 +383,21 @@ public class BulletinController : MonoBehaviour
         var t = SpawnLine(parent, text);
         t.color = (opt != null && opt.customColor.HasValue)
             ? opt.customColor.Value
-            : config.labelColor;
+            : bulletinConfig.labelColor;
     }
 
     private void CreateLiveLabelLine(Transform parent, Func<string> getter)
     {
         string initial = getter != null ? getter() : string.Empty;
         var t = SpawnLine(parent, initial);
-        t.color = config.labelColor;
+        t.color = bulletinConfig.labelColor;
         liveLines.Add(new LiveLine { text = t, getter = getter, last = initial });
     }
 
     private void CreateBackLine(Transform parent)
     {
         var t = SpawnLine(parent, backLabel);
-        t.color = config.selectableNormalColor;
+        t.color = bulletinConfig.selectableNormalColor;
         activeLines.Add(t);
     }
 
@@ -435,8 +430,8 @@ public class BulletinController : MonoBehaviour
             var t = activeLines[i];
             if (!t) continue;
             t.color = (i == currentMenuIndex)
-                ? config.selectableHighlightColor
-                : config.selectableNormalColor;
+                ? bulletinConfig.selectableHighlightColor
+                : bulletinConfig.selectableNormalColor;
         }
     }
 
@@ -473,12 +468,12 @@ public class BulletinController : MonoBehaviour
 
     private void PlayMove()
     {
-        if (audioSource && config.sfxMove) audioSource.PlayOneShot(config.sfxMove);
+        if (audioSource && bulletinConfig.sfxMove) audioSource.PlayOneShot(bulletinConfig.sfxMove);
     }
 
     private void PlayConfirm()
     {
-        if (audioSource && config.sfxConfirm) audioSource.PlayOneShot(config.sfxConfirm);
+        if (audioSource && bulletinConfig.sfxConfirm) audioSource.PlayOneShot(bulletinConfig.sfxConfirm);
     }
 
     private void OnPhaseChanged_Global(int day, DayPhase phase)

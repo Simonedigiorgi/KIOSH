@@ -1,62 +1,68 @@
 ﻿using System;
 using System.Collections;
 using UnityEngine;
+using Sirenix.OdinInspector;
 
+[DisallowMultipleComponent]
 public class CookingStation : MonoBehaviour, IInteractable
 {
     [Header("Refs")]
-    public Transform fillCylinder;
-    public Renderer fillRenderer;
+    [Required] public Transform fillCylinder;
 
     [Header("Liquid Jet")]
-    [Tooltip("GameObject del getto liquido (es. cilindro con shader/particle).")]
+    [Tooltip("GameObject del getto liquido (es. cilindro/particle).")]
     public GameObject liquidJet;
-    [SerializeField] private float liquidFadeTime = 0.3f; // tempo animazione fade
+    [SerializeField, Min(0f)] private float liquidFadeTime = 0.3f;
     private Coroutine liquidRoutine;
 
     [Header("Times")]
-    public float fillTime = 3f;
-    public float cookTime = 5f;
-    public float consumeAnimTime = 0.25f;
+    [Min(0.01f)] public float fillTime = 3f;
+    [Min(0.01f)] public float cookTime = 5f;
+    [Min(0f)] public float consumeAnimTime = 0.25f;
 
     [Header("Servings")]
-    public int maxServings = 5;
-    public int RemainingServings => remainingServings;
-    private int remainingServings = 0;
+    [Min(1)] public int maxServings = 5;
+    public int RemainingServings => _remainingServings;
+    private int _remainingServings;
 
     [Header("Fill Y Range (solo estetico)")]
-    public float emptyY = 0.02f; // livello a vuoto
-    public float fullY = 0.24f;  // livello a pieno
+    public float emptyY = 0.02f;
+    public float fullY = 0.24f;
 
-    // 🔒 Gating produzione quando il delivery goal è raggiunto
-    [Header("Delivery Gate (opzionale)")]
-    [Tooltip("Se impostato, quando TotalDelivered >= deliveryGoal non è più possibile preparare cibo.")]
-    public DeliveryBox deliveryBox;
-    [Tooltip("Messaggio HUD quando il goal è raggiunto.")]
-    public string msgGoalReached = "Tutte le consegne sono state completate. Non è possibile preparare altro cibo.";
+    [Header("Delivery Gate (OBBLIGATORIO)")]
+    [Required, Tooltip("Blocca la produzione quando TotalDelivered >= deliveryGoal.")]
+    [SerializeField] private DeliveryBox deliveryBox;
+
+    // messaggio privato (non più public)
+    private const string MSG_GOAL_REACHED = "Tutte le consegne sono state completate. Non è possibile preparare altro cibo.";
 
     private Coroutine currentRoutine;
-    public float Progress01 => progress;
-    private float progress = 0f;
+    public float Progress01 => _progress;   // usato dalla UI per le percentuali
+    private float _progress;
 
     public enum State { Empty, Filling, Filled, Cooking, Cooked }
     public State CurrentState { get; private set; } = State.Empty;
 
     // Eventi per UI/adapter
     public static event Action OnStationStateChanged;
-    public event Action OnStateChanged;              // di istanza (più fine)
-
-    // Shader perf
-    private static readonly int CookProgressID = Shader.PropertyToID("_CookProgress");
-    private MaterialPropertyBlock mpb;
+    public event Action OnStateChanged;
 
     // ---------- Lifecycle ----------
     private void Awake()
     {
-        if (fillRenderer && mpb == null) mpb = new MaterialPropertyBlock();
+        if (!fillCylinder)
+            Debug.LogError("[CookingStation] Assegna 'fillCylinder' nel Inspector.");
+
+        if (!deliveryBox)
+        {
+            Debug.LogError("[CookingStation] 'deliveryBox' è OBBLIGATORIO. Disabilito la stazione.");
+            enabled = false;
+            return;
+        }
+
         if (liquidJet) liquidJet.SetActive(false);
         SetCylinderHeight(emptyY);
-        UpdateShader(0f);
+        _progress = 0f;
     }
 
     private void OnEnable()
@@ -82,12 +88,11 @@ public class CookingStation : MonoBehaviour, IInteractable
     {
         StopActiveRoutines();
 
-        progress = 0f;
-        remainingServings = 0;
+        _progress = 0f;
+        _remainingServings = 0;
         SetState(State.Empty);
 
         SetCylinderHeight(emptyY);
-        UpdateShader(0f);
         if (liquidJet) liquidJet.SetActive(false);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -115,17 +120,14 @@ public class CookingStation : MonoBehaviour, IInteractable
         OnStationStateChanged?.Invoke();
     }
 
-    // ---------- Helpers gate ----------
-    private bool IsDeliveryGoalReached()
-    {
-        return deliveryBox != null && DeliveryBox.TotalDelivered >= deliveryBox.deliveryGoal;
-    }
+    // ---------- Gate ----------
+    private bool IsDeliveryGoalReached() => DeliveryBox.TotalDelivered >= deliveryBox.deliveryGoal;
 
     private bool DenyIfGoalReached()
     {
         if (IsDeliveryGoalReached())
         {
-            HUDManager.Instance?.ShowDialog(msgGoalReached);
+            HUDManager.Instance?.ShowDialog(MSG_GOAL_REACHED);
             return true;
         }
         return false;
@@ -134,11 +136,11 @@ public class CookingStation : MonoBehaviour, IInteractable
     // ---------- Interazione ----------
     public void Interact(PlayerInteractor player)
     {
-        var held = player.HeldPickup;
-        if (held == null) return;
+        var held = player?.HeldPickup;
+        if (!held) return;
 
         var dish = held.GetComponent<Dish>();
-        if (dish == null) return;
+        if (!dish) return;
 
         if (dish.IsComplete)
         {
@@ -152,16 +154,14 @@ public class CookingStation : MonoBehaviour, IInteractable
         }
 
         if (dish.TryAddFromStation(this))
-        {
             ConsumeServing();
-        }
     }
 
     // --- Inserimento ---
     public void InsertFood()
     {
         if (CurrentState != State.Empty) return;
-        if (DenyIfGoalReached()) return; // ⛔ blocco produzione a goal raggiunto
+        if (DenyIfGoalReached()) return;
 
         if (currentRoutine != null) StopCoroutine(currentRoutine);
         currentRoutine = StartCoroutine(FillRoutine());
@@ -170,25 +170,25 @@ public class CookingStation : MonoBehaviour, IInteractable
     private IEnumerator FillRoutine()
     {
         SetState(State.Filling);
-        progress = 0f;
+        _progress = 0f;
 
-        SetLiquidJet(true); // accendi con fade
+        SetLiquidJet(true);
 
         float t = 0f;
+        float inv = 1f / Mathf.Max(0.0001f, fillTime);
         while (t < fillTime)
         {
             t += Time.deltaTime;
-            float k = Mathf.Clamp01(t / fillTime);
+            float k = Mathf.Clamp01(t * inv);
             SetCylinderHeight(Mathf.Lerp(emptyY, fullY, k));
-            progress = k;
+            _progress = k;
             yield return null;
         }
 
-        progress = 1f;
+        _progress = 1f;
         SetState(State.Filled);
 
-        SetLiquidJet(false); // spegni con fade
-
+        SetLiquidJet(false);
         currentRoutine = null;
     }
 
@@ -196,7 +196,7 @@ public class CookingStation : MonoBehaviour, IInteractable
     public void StartCooking()
     {
         if (CurrentState != State.Filled) return;
-        if (DenyIfGoalReached()) return; // ⛔ blocco produzione a goal raggiunto
+        if (DenyIfGoalReached()) return;
 
         if (currentRoutine != null) StopCoroutine(currentRoutine);
         currentRoutine = StartCoroutine(CookRoutine());
@@ -205,68 +205,61 @@ public class CookingStation : MonoBehaviour, IInteractable
     private IEnumerator CookRoutine()
     {
         SetState(State.Cooking);
-        progress = 0f;
-        UpdateShader(0f);
+        _progress = 0f;
 
         float t = 0f;
+        float inv = 1f / Mathf.Max(0.0001f, cookTime);
         while (t < cookTime)
         {
             t += Time.deltaTime;
-            progress = Mathf.Clamp01(t / cookTime);
-            UpdateShader(progress);
+            _progress = Mathf.Clamp01(t * inv);
             yield return null;
         }
 
-        progress = 1f;
-        UpdateShader(1f);
+        _progress = 1f;
 
-        remainingServings = Mathf.Max(1, maxServings);
+        _remainingServings = Mathf.Max(1, maxServings);
         SetCylinderHeight(fullY);
         SetState(State.Cooked);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log($"[CookingStation] Cottura completata. Porzioni: {remainingServings}/{maxServings}");
+        Debug.Log($"[CookingStation] Cottura completata. Porzioni: {_remainingServings}/{maxServings}");
 #endif
         currentRoutine = null;
     }
 
     // --- Servings ---
-    public bool CanServeDish() => CurrentState == State.Cooked && remainingServings > 0;
+    public bool CanServeDish() => CurrentState == State.Cooked && _remainingServings > 0;
 
     public void ConsumeServing()
     {
-        if (remainingServings <= 0) return;
+        if (_remainingServings <= 0) return;
 
-        remainingServings = Mathf.Max(remainingServings - 1, 0);
+        _remainingServings = Mathf.Max(_remainingServings - 1, 0);
 
-        float ratio = (maxServings > 0) ? (float)remainingServings / maxServings : 0f;
+        float ratio = (maxServings > 0) ? (float)_remainingServings / maxServings : 0f;
         float targetY = Mathf.Lerp(emptyY, fullY, ratio);
 
         if (currentRoutine != null) StopCoroutine(currentRoutine);
-
-        bool isLast = remainingServings <= 0;
+        bool isLast = _remainingServings <= 0;
         currentRoutine = StartCoroutine(LerpCylinderY(targetY, isLast));
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        Debug.Log($"[CookingStation] Porzione servita. Rimaste: {remainingServings}/{maxServings}");
+        Debug.Log($"[CookingStation] Porzione servita. Rimaste: {_remainingServings}/{maxServings}");
 #endif
 
-        if (!isLast)
-        {
-            // per le porzioni intermedie notifichiamo subito
-            RaiseStateChanged();
-        }
-        // se è l'ultima, il Reset arriverà dopo il lerp (vedi LerpCylinderY)
+        if (!isLast) RaiseStateChanged();
     }
 
     private IEnumerator LerpCylinderY(float targetY, bool resetAfter = false)
     {
         float startY = fillCylinder ? fillCylinder.localPosition.y : 0f;
         float t = 0f;
+        float inv = 1f / Mathf.Max(0.0001f, consumeAnimTime);
         while (t < consumeAnimTime)
         {
             t += Time.deltaTime;
-            float k = Mathf.Clamp01(t / consumeAnimTime);
+            float k = Mathf.Clamp01(t * inv);
             SetCylinderHeight(Mathf.Lerp(startY, targetY, k));
             yield return null;
         }
@@ -275,9 +268,8 @@ public class CookingStation : MonoBehaviour, IInteractable
 
         if (resetAfter)
         {
-            // aspetta un frame per garantire update UI, poi reset completo
-            yield return null;
-            ResetStation(); // ora l'anim è finita, non verrà interrotta
+            yield return null; // lascia aggiornare la UI
+            ResetStation();
         }
     }
 
@@ -289,22 +281,13 @@ public class CookingStation : MonoBehaviour, IInteractable
         fillCylinder.localPosition = new Vector3(p.x, y, p.z);
     }
 
-    private void UpdateShader(float value)
-    {
-        if (!fillRenderer) return;
-        if (mpb == null) mpb = new MaterialPropertyBlock();
-        fillRenderer.GetPropertyBlock(mpb);
-        mpb.SetFloat(CookProgressID, value);
-        fillRenderer.SetPropertyBlock(mpb);
-    }
-
     private void ResetStation()
     {
         StopActiveRoutines();
 
         SetCylinderHeight(emptyY);
-        progress = 0f;
-        remainingServings = 0;
+        _progress = 0f;
+        _remainingServings = 0;
         if (liquidJet) liquidJet.SetActive(false);
 
         SetState(State.Empty);
@@ -328,17 +311,19 @@ public class CookingStation : MonoBehaviour, IInteractable
         if (turnOn && !liquidJet.activeSelf)
         {
             liquidJet.SetActive(true);
-            tr.localScale = new Vector3(0f, tr.localScale.y, 0f); // raggio 0, altezza invariata
+            var s = tr.localScale;
+            tr.localScale = new Vector3(0f, s.y, 0f); // raggio 0, Y invariata
         }
 
         float t = 0f;
+        float inv = 1f / Mathf.Max(0.0001f, liquidFadeTime);
         Vector3 start = tr.localScale;
         Vector3 target = turnOn ? new Vector3(0.75f, start.y, 0.75f) : new Vector3(0f, start.y, 0f);
 
         while (t < liquidFadeTime)
         {
             t += Time.deltaTime;
-            float k = Mathf.Clamp01(t / liquidFadeTime);
+            float k = Mathf.Clamp01(t * inv);
             var s = Vector3.Lerp(start, target, k);
             tr.localScale = new Vector3(s.x, start.y, s.z); // blocca Y
             yield return null;

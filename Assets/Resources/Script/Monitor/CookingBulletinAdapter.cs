@@ -1,30 +1,23 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Events;
+using System.Collections.Generic;
+using Sirenix.OdinInspector;
 
 public class CookingBulletinAdapter : BulletinAdapterBase
 {
     [Header("Refs")]
-    public CookingStation station;
+    [Required] public CookingStation station;
 
-    [Header("Dish / Interact")]
-    [Tooltip("Oggetto da rendere cliccabile (Layer Interactable) quando selezioni 'Ottieni piatto'. " +
-             "Se lasci vuoto, userà il GameObject del DishDispenser sottostante.")]
-    public GameObject interactTarget;
-
-    [Tooltip("Script che, quando clicchi (Interact), dà il piatto al giocatore.")]
-    public DishDispenser dishDispenser;
-
-    [Tooltip("DeliveryBox usata per spedire: serve a bloccare tutto quando il goal è raggiunto.")]
+    [Header("Delivery Gate")]
+    [Required, Tooltip("DeliveryBox per conoscere il deliveryGoal e bloccare tutto a goal raggiunto.")]
     public DeliveryBox deliveryBox;
 
-    [Header("Layers")]
-    [SerializeField] private string interactableLayerName = "Interactable";
-    [SerializeField] private string disabledLayerName = "Default";
+    [Header("Dish Spawn")]
+    [Required, Tooltip("Prefab del piatto da spawnare quando selezioni 'Ottieni piatto'.")]
+    public GameObject dishPrefab;
 
-    private int _interactableLayer = -1;
-    private int _disabledLayer = -1;
+    [Required, Tooltip("Pivot (Transform) dove spawnare il piatto.")]
+    public Transform dishSpawnPivot;
 
     [Header("UI Strings")]
     [TextArea] public string emptyText = "Stato della Cooking Staion: Operativo";
@@ -37,33 +30,27 @@ public class CookingBulletinAdapter : BulletinAdapterBase
 
     [Header("Feedback")]
     [TextArea] public string msgNoStationReady = "La pentola non è pronta o non ha porzioni disponibili.";
-    [TextArea] public string msgNoDispenser = "Nessun dispenser collegato.";
+    [TextArea] public string msgMissingPrefabOrPivot = "Configurazione mancante: assegna il prefab del piatto e un pivot di spawn.";
 
     private BulletinController controller;
 
-    // gating: “uno alla volta finché non lo spedisci”
+    // “uno alla volta finché non lo spedisci”
     private bool hasUndeliveredDish = false;
     private int deliveredCountWhenTaken = 0;
 
-    // blocco quando raggiungi il goal
+    // gate “giornaliero” quando arrivi al goal
     private bool isDeliveryGoalReached = false;
 
-    private Coroutine armRoutine;
-
+    // ----------------- Lifecycle -----------------
     void Awake()
     {
         controller = GetComponentInParent<BulletinController>();
 
-        _interactableLayer = LayerMask.NameToLayer(interactableLayerName);
-        _disabledLayer = LayerMask.NameToLayer(disabledLayerName);
-        if (_interactableLayer < 0) { _interactableLayer = 0; Debug.LogWarning("[CookingBulletinAdapter] Layer 'Interactable' non trovato, uso Default(0)."); }
-        if (_disabledLayer < 0) { _disabledLayer = 0; }
-
-        if (!interactTarget && dishDispenser) interactTarget = dishDispenser.gameObject;
-
-        // assicura che la station conosca la deliveryBox per il gate (opzionale ma utile)
-        if (station && deliveryBox && !station.deliveryBox)
-            station.deliveryBox = deliveryBox;
+        // Odin [Required] già segnala in Inspector, qui solo log safety
+        if (!station) Debug.LogError("[CookingBulletinAdapter] 'station' non assegnata.");
+        if (!deliveryBox) Debug.LogError("[CookingBulletinAdapter] 'deliveryBox' non assegnata.");
+        if (!dishPrefab) Debug.LogError("[CookingBulletinAdapter] 'dishPrefab' non assegnato.");
+        if (!dishSpawnPivot) Debug.LogError("[CookingBulletinAdapter] 'dishSpawnPivot' non assegnato.");
     }
 
     void OnEnable()
@@ -77,10 +64,7 @@ public class CookingBulletinAdapter : BulletinAdapterBase
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted += HandleAllDeliveriesCompleted;
 
         if (deliveryBox && DeliveryBox.TotalDelivered >= deliveryBox.deliveryGoal)
-        {
             isDeliveryGoalReached = true;
-            ArmInteractTarget(false);
-        }
     }
 
     void OnDisable()
@@ -92,62 +76,38 @@ public class CookingBulletinAdapter : BulletinAdapterBase
 
         DeliveryBox.OnDeliveredCountChanged -= HandleDeliveredCountChanged;
         DeliveryBulletinAdapter.OnAllDeliveriesCompleted -= HandleAllDeliveriesCompleted;
-
-        ArmInteractTarget(false);
     }
 
+    // ----------------- Events -----------------
     private void HandlePhaseChanged(int day, DayPhase phase)
     {
-        if (phase == DayPhase.Morning)
-        {
-            // ✅ nuovo giorno → pannello operativo
-            isDeliveryGoalReached = false;        // sblocca UI
-            hasUndeliveredDish = false;           // azzera gating "uno alla volta"
-            deliveredCountWhenTaken = DeliveryBox.TotalDelivered; // sarà 0 dopo il reset
-            ArmInteractTarget(false);             // sicurezza
-        }
+        if (phase == DayPhase.Morning) ResetDailyGate();
         RefreshPanel();
     }
 
     private void HandleDeliveredCountChanged(int newTotal)
     {
-        if (hasUndeliveredDish && newTotal > deliveredCountWhenTaken)
-        {
-            hasUndeliveredDish = false;
-        }
-
-        if (deliveryBox && newTotal >= deliveryBox.deliveryGoal)
-        {
-            isDeliveryGoalReached = true;
-            ArmInteractTarget(false);
-        }
-
+        if (PlayerDispatchedSinceTaken(newTotal)) hasUndeliveredDish = false;
+        if (ReachedGoal(newTotal)) MarkGoalReached();
         RefreshPanel();
     }
 
     private void HandleAllDeliveriesCompleted()
     {
-        isDeliveryGoalReached = true;
-        ArmInteractTarget(false);
+        MarkGoalReached();
         RefreshPanel();
     }
 
-    private void RefreshPanel() => controller?.RefreshNow();
-
+    // ----------------- Build Options -----------------
     public override List<BulletinController.MenuOption> BuildOptions(List<BulletinController.MenuOption> baseOptions)
     {
-        var list = (baseOptions != null)
-            ? new List<BulletinController.MenuOption>(baseOptions)
-            : new List<BulletinController.MenuOption>();
+        var list = CloneOrNew(baseOptions);
 
         if (!station)
         {
-            list.Add(new BulletinController.MenuOption { title = "Nessuna stazione collegata", action = BulletinController.MenuOption.MenuAction.Label });
+            list.Add(MakeLabel("Nessuna stazione collegata"));
             return list;
         }
-
-        bool goalReachedNow = isDeliveryGoalReached
-                              || (deliveryBox && DeliveryBox.TotalDelivered >= deliveryBox.deliveryGoal);
 
         // Stato live
         list.Add(new BulletinController.MenuOption
@@ -157,32 +117,23 @@ public class CookingBulletinAdapter : BulletinAdapterBase
             dynamicTextProvider = BuildStatusText
         });
 
-        // Se goal raggiunto, mostra un messaggio e basta
-        if (goalReachedNow)
+        // Goal raggiunto → info e stop
+        if (GoalReachedNow)
         {
-            list.Add(new BulletinController.MenuOption
-            {
-                title = goalReachedText,
-                action = BulletinController.MenuOption.MenuAction.Label
-            });
+            list.Add(MakeLabel(goalReachedText));
             return list;
         }
 
-        // Inserisci cibo
+        // Inserisci / Cucina
         if (station.CurrentState == CookingStation.State.Empty)
-            list.Add(MakeInvoke("Inserisci cibo", station.InsertFood));
+            AddInvoke(list, "Inserisci cibo", station.InsertFood);
 
-        // Cucina cibo
         if (station.CurrentState == CookingStation.State.Filled)
-            list.Add(MakeInvoke("Cucina cibo", station.StartCooking));
+            AddInvoke(list, "Cucina cibo", station.StartCooking);
 
-        // Ottieni piatto → mostra solo se: pentola pronta + non stai aspettando una spedizione
-        if (station.CurrentState == CookingStation.State.Cooked &&
-            station.CanServeDish() &&
-            !hasUndeliveredDish)
-        {
-            list.Add(MakeInvoke(getDishLabel, HandleArmGetDish));
-        }
+        // Ottieni piatto (spawn diretto)
+        if (ShouldShowGetDish())
+            AddInvoke(list, getDishLabel, HandleSpawnDish);
 
         return list;
     }
@@ -206,6 +157,47 @@ public class CookingBulletinAdapter : BulletinAdapterBase
         }
     }
 
+    // ----------------- Actions -----------------
+    private void HandleSpawnDish()
+    {
+        if (GoalReachedNow) { MarkGoalReached(); RefreshPanel(); return; }
+        if (!station || !station.CanServeDish()) { HUDManager.Instance?.ShowDialog(msgNoStationReady); return; }
+        if (!dishPrefab || !dishSpawnPivot)
+        {
+            HUDManager.Instance?.ShowDialog(msgMissingPrefabOrPivot);
+            Debug.LogWarning("[CookingBulletinAdapter] Mancano dishPrefab e/o dishSpawnPivot.");
+            return;
+        }
+
+        // Spawn in world-space sul pivot
+        var go = Object.Instantiate(dishPrefab, dishSpawnPivot.position, dishSpawnPivot.rotation, null);
+
+        // set come pickup liberamente raccoglibile
+        var pickup = go.GetComponent<PickupObject>();
+        if (pickup) { pickup.canBePickedUp = true; pickup.isHeld = false; }
+
+        // Gate “uno alla volta”
+        hasUndeliveredDish = true;
+        deliveredCountWhenTaken = DeliveryBox.TotalDelivered;
+
+        RefreshPanel();
+    }
+
+    // ----------------- Helpers -----------------
+    private void RefreshPanel() => controller?.RefreshNow();
+
+    private bool GoalReachedNow =>
+        isDeliveryGoalReached || (deliveryBox && DeliveryBox.TotalDelivered >= deliveryBox.deliveryGoal);
+
+    private static List<BulletinController.MenuOption> CloneOrNew(List<BulletinController.MenuOption> src)
+        => (src != null) ? new List<BulletinController.MenuOption>(src) : new List<BulletinController.MenuOption>();
+
+    private static void AddInvoke(List<BulletinController.MenuOption> list, string title, UnityAction action)
+        => list.Add(MakeInvoke(title, action));
+
+    private static BulletinController.MenuOption MakeLabel(string text)
+        => new BulletinController.MenuOption { title = text, action = BulletinController.MenuOption.MenuAction.Label };
+
     private static BulletinController.MenuOption MakeInvoke(string title, UnityAction action)
     {
         var opt = new BulletinController.MenuOption
@@ -218,70 +210,23 @@ public class CookingBulletinAdapter : BulletinAdapterBase
         return opt;
     }
 
-    // ====== “Ottieni piatto” → arma/disarma il target Interactable ======
-    private void HandleArmGetDish()
+    private bool ShouldShowGetDish()
+        => station.CurrentState == CookingStation.State.Cooked && station.CanServeDish() && !hasUndeliveredDish && !GoalReachedNow;
+
+    private bool PlayerDispatchedSinceTaken(int newTotal) => hasUndeliveredDish && newTotal > deliveredCountWhenTaken;
+
+    private bool ReachedGoal(int total) => deliveryBox && total >= deliveryBox.deliveryGoal;
+
+    private void MarkGoalReached()
     {
-        // safeguard se nel frattempo hai raggiunto il goal
-        if (deliveryBox && DeliveryBox.TotalDelivered >= deliveryBox.deliveryGoal)
-        {
-            isDeliveryGoalReached = true;
-            ArmInteractTarget(false);
-            RefreshPanel();
-            return;
-        }
+        isDeliveryGoalReached = true;
+        hasUndeliveredDish = false;
+    }
 
-        if (!station || !station.CanServeDish())
-        {
-            HUDManager.Instance?.ShowDialog(msgNoStationReady);
-            return;
-        }
-        if (!dishDispenser || !interactTarget)
-        {
-            HUDManager.Instance?.ShowDialog(msgNoDispenser);
-            Debug.LogWarning("[CookingBulletinAdapter] Dispenser o InteractTarget non assegnato.");
-            return;
-        }
-
-        // 1) Rendi cliccabile il target
-        ArmInteractTarget(true);
-
-        // 2) Nascondi subito la voce finché non spedisci
-        hasUndeliveredDish = true;
+    private void ResetDailyGate()
+    {
+        isDeliveryGoalReached = false;
+        hasUndeliveredDish = false;
         deliveredCountWhenTaken = DeliveryBox.TotalDelivered;
-
-        // 3) Anti-spam: quando il player prende qualcosa in mano → disarma
-        if (armRoutine != null) StopCoroutine(armRoutine);
-        armRoutine = StartCoroutine(WaitUntilPlayerHoldsSomethingThenDisarm());
-
-        RefreshPanel();
-    }
-
-    private IEnumerator WaitUntilPlayerHoldsSomethingThenDisarm()
-    {
-        var player = FindFirstObjectByType<PlayerInteractor>(FindObjectsInactive.Include);
-        if (!player) yield break;
-
-        while (!player.IsHoldingObject())
-            yield return null;
-
-        ArmInteractTarget(false);
-        armRoutine = null;
-    }
-
-    private void ArmInteractTarget(bool on)
-    {
-        var go = interactTarget ? interactTarget : (dishDispenser ? dishDispenser.gameObject : null);
-        if (!go) return;
-
-        SetLayerRecursively(go, on ? _interactableLayer : _disabledLayer);
-    }
-
-    private static void SetLayerRecursively(GameObject go, int layer)
-    {
-        if (!go) return;
-        go.layer = layer;
-        var t = go.transform;
-        for (int i = 0; i < t.childCount; i++)
-            SetLayerRecursively(t.GetChild(i).gameObject, layer);
     }
 }

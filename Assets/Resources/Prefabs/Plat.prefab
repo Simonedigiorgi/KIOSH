@@ -971,7 +971,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ingredientPivot: {fileID: 7320093189705889203}
-  filledPrefab: {fileID: 0}
+  filledPrefab: {fileID: 6770448299845117541, guid: 8be1cdc1d1abf4048876ee6dd938a56a, type: 3}
 --- !u!43 &3489473763428342992
 Mesh:
   m_ObjectHideFlags: 0
